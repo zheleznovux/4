@@ -2,13 +2,18 @@ package main
 
 import (
 	"os"
+	"runtime"
 	"strings"
+	"time"
 
-	"zheleznovux.com/modbus-console/cmd/app"
-	"zheleznovux.com/modbus-console/cmd/tags"
+	app "zheleznovux.com/modbus-console/cmd/app"
+	tags "zheleznovux.com/modbus-console/cmd/storage"
+	win "zheleznovux.com/modbus-console/cmd/win"
 )
 
 func main() {
+	runtime.GOMAXPROCS(4)
+
 	ts := tags.New()
 
 	if len(os.Args) > 1 {
@@ -17,7 +22,13 @@ func main() {
 			ts.Sync = true
 		}
 	}
-
 	app.InitConfig("config.json", ts)
-	app.Run(ts)
+	win.InitConfig("win_config.json")
+
+	go app.Run(ts)
+	go win.Run(ts)
+
+	for {
+		time.Sleep(200000000)
+	}
 }

@@ -1,19 +1,19 @@
 {
 "NODES":[
     {
-        "name" : "testNode11",
+        "name" : "testNode1",
         "IP": "127.0.0.1",
         "port":502,
         "ID":1,
         "TAGS": [
             {
-                "name": "testTag1_1",
+                "name": "testTag1",
                 "address":"0001",
                 "dataType": "word",
                 "scanPeriod":5.5
             },
             {
-                "name": "testTag1_2",
+                "name": "testTag2",
                 "address":"0004",
                 "dataType": "coil",
                 "scanPeriod":5.5,
@@ -28,13 +28,13 @@
         "ID":1,
         "TAGS": [
             {
-                "name": "testTag2_1",
+                "name": "testTag1",
                 "address":"30001",
                 "dataType": "word",
                 "scanPeriod":4.5
             },
             {
-                "name": "testTag2_2",
+                "name": "testTag2",
                 "address":"30002",
                 "dataType": "coil",
                 "scanPeriod":7.5,

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	modbus "github.com/things-go/go-modbus"
-	"zheleznovux.com/modbus-console/cmd/tags"
+	tags "zheleznovux.com/modbus-console/cmd/storage"
 )
 
 type Client struct {
@@ -18,19 +18,19 @@ type Client struct {
 	sender  modbus.Client
 }
 
-func (c *Client) GetName() string {
+func (c *Client) Name() string {
 	return c.name
 }
 
-func (c *Client) GetIp() string {
+func (c *Client) Ip() string {
 	return c.ip
 }
 
-func (c *Client) GetPort() int {
+func (c *Client) Port() int {
 	return c.port
 }
 
-func (c *Client) GetSlaveId() uint8 {
+func (c *Client) SalveId() uint8 {
 	return c.slaveId
 }
 
@@ -42,14 +42,14 @@ func NewClinet(ip string, port int, slaveID uint8, name string) (Client, error) 
 
 	ipAddr := net.ParseIP(strings.TrimSpace(ip))
 	if ipAddr == nil {
-		return Client{}, fmt.Errorf("Ошибка парса Ip {constructor}")
+		return Client{}, fmt.Errorf("Ошибка парса Ip {constructor Clinet}")
 	} else {
 		c.ip = ip
 	}
 
 	if (port > 65536) || (port < 1) {
 		c.port = 502
-		return Client{}, fmt.Errorf("Ошибка парса порта {constructor}")
+		return Client{}, fmt.Errorf("Ошибка парса порта {constructor Clinet}")
 	} else {
 		c.port = port
 	}
@@ -102,14 +102,14 @@ func (c *Client) SetTag(name string, address string, scanPeriod float64, typeTag
 	return nil
 }
 
-func (c *Client) GetTags() []tags.BaseTag {
+func (c *Client) Tags() []tags.BaseTag {
 	return c.tags
 }
 
 func (c *Client) SetIp(ip string) error {
 	ipAddr := net.ParseIP(strings.TrimSpace(ip))
 	if ipAddr == nil {
-		return fmt.Errorf("Недопустимый Ip. {setter}")
+		return fmt.Errorf("Недопустимый Ip. {setter Ip}")
 	} else {
 		c.ip = ip
 		return nil
@@ -119,7 +119,7 @@ func (c *Client) SetIp(ip string) error {
 func (c *Client) SetPort(port int) error {
 	if (port > 65536) || (port < 1) {
 		c.port = 502
-		return fmt.Errorf("Ошибка парса порта {constructor}")
+		return fmt.Errorf("Ошибка парса порта {setter Port}")
 	} else {
 		c.port = port
 		return nil
@@ -127,9 +127,11 @@ func (c *Client) SetPort(port int) error {
 }
 
 func (c *Client) Connect() error {
+	// provider := modbus.NewTCPClientProvider(
+	// 	c.ip+":"+fmt.Sprint(c.port),
+	// 	modbus.WithEnableLogger())
 	provider := modbus.NewTCPClientProvider(
-		c.ip+":"+fmt.Sprint(c.port),
-		modbus.WithEnableLogger())
+		c.ip + ":" + fmt.Sprint(c.port))
 	c.sender = modbus.NewClient(provider)
 
 	//устанавливаем соединение

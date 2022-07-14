@@ -5,9 +5,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"zheleznovux.com/modbus-console/cmd/app/modbus"
-	"zheleznovux.com/modbus-console/cmd/configuration"
-	"zheleznovux.com/modbus-console/cmd/tags"
+	modbus "zheleznovux.com/modbus-console/cmd/app/modbus"
+	configuration "zheleznovux.com/modbus-console/cmd/configuration"
+	tags "zheleznovux.com/modbus-console/cmd/storage"
 )
 
 type AppConfig struct {
@@ -19,35 +19,40 @@ type AppConfigMgr struct {
 }
 
 var appConfigMgr = &AppConfigMgr{}
-var changeCh chan int = make(chan int)
+var changeCh chan int
 
 func (a *AppConfigMgr) Callback(conf *configuration.ConfigHandler) {
 	appConfig := &AppConfig{}
-	appConfig.clients = Setup(conf)
+	appConfig.clients = setup(conf)
+	fmt.Println(appConfig.clients)
+
 	changeCh <- 1
 	appConfigMgr.config.Store(appConfig)
 }
 
-func Setup(ch *configuration.ConfigHandler) []modbus.Client {
+func setup(ch *configuration.ConfigHandler) []modbus.Client {
+
 	config := ch.GetConfig()
 	rtn := make([]modbus.Client, 0)
-	var err error
 
-	for i := range config.NODES {
+	var err error
+	nodes := config.(*configuration.ConfigurationDataNode).NODES
+	for i := range nodes {
 		var tmp modbus.Client
-		tmp, err = modbus.NewClinet(config.NODES[i].IP, config.NODES[i].Port, config.NODES[i].ID, config.NODES[i].Name)
+		tmp, err = modbus.NewClinet(nodes[i].IP, nodes[i].Port, nodes[i].ID, nodes[i].Name)
 		if err != nil {
 			fmt.Println(err)
 			continue
 		}
 
-		for j := range config.NODES[i].TAGS {
+		for j := range nodes[i].TAGS {
 			err := tmp.SetTag(
-				config.NODES[i].TAGS[j].Name,
-				config.NODES[i].TAGS[j].Address,
-				config.NODES[i].TAGS[j].ScanPeriod,
-				config.NODES[i].TAGS[j].DataType,
-				config.NODES[i].TAGS[j].DataBit)
+				nodes[i].TAGS[j].Name,
+				nodes[i].TAGS[j].Address,
+				nodes[i].TAGS[j].ScanPeriod,
+				nodes[i].TAGS[j].DataType,
+				nodes[i].TAGS[j].DataBit)
+
 			if err != nil {
 				fmt.Println(err)
 				continue
@@ -60,7 +65,7 @@ func Setup(ch *configuration.ConfigHandler) []modbus.Client {
 	return rtn
 }
 
-func InitConfig(file string, ts *tags.TagsHandler) {
+func InitConfig(file string, th *tags.TagsHandler) {
 	conf, err := configuration.NewConfig(file)
 	if err != nil {
 		fmt.Printf("read config file err: %v\n", err)
@@ -68,33 +73,34 @@ func InitConfig(file string, ts *tags.TagsHandler) {
 	}
 
 	conf.AddObserver(appConfigMgr)
-	conf.AddObserver(ts)
+	conf.AddObserver(th)
 
 	var appConfig AppConfig
-	appConfig.clients = Setup(conf)
-	ts.SetData(tags.Setup(conf))
+	appConfig.clients = setup(conf)
+	th.SetData(tags.Setup(conf))
 
 	appConfigMgr.config.Store(&appConfig)
-	fmt.Println("Выполнена загрузка конфигурации")
+	fmt.Println("Выполнена загрузка конфигурации тэгов")
 }
 
-func startSender(client modbus.Client, clientId int, tagId int, quit chan int, ts *tags.TagsHandler) {
+func startSender(client modbus.Client, clientId int, tagId int, quit chan int, th *tags.TagsHandler) {
+	fmt.Println("Запущен опрос тега " + client.Name() + "." + client.Tags()[tagId].GetName())
+
 	for {
 		select {
+		case <-quit:
+			{
+				return
+			}
 		default:
 			{
 				err := client.Send(tagId)
 				if err != nil {
 					fmt.Println(err)
 				} else {
-					ts.SetDataTag(clientId, tagId, &client.GetTags()[tagId])
+					th.SetDataTag(clientId, tagId, &client.Tags()[tagId])
 				}
-				time.Sleep(time.Duration(client.GetTags()[tagId].GetScanPeriod()) * time.Second)
-
-			}
-		case <-quit:
-			{
-				return
+				time.Sleep(time.Duration(client.Tags()[tagId].GetScanPeriod()) * time.Second)
 
 			}
 		}
@@ -102,17 +108,29 @@ func startSender(client modbus.Client, clientId int, tagId int, quit chan int, t
 	}
 }
 
-// context
+// func tryConnect() {
+// 	for {
+// 		err := appConfig.clients[clientId].Connect()
+// 		if err != nil {
+// 			continue
+// 		}
+// 	}
 
-func Run(ts *tags.TagsHandler) {
-	fmt.Println("Запущено")
+// }
+
+func Run(th *tags.TagsHandler) {
 	var channelCount int
 	appConfig := appConfigMgr.config.Load().(*AppConfig)
+
 	quit := make(chan int)
+	changeCh = make(chan int)
+
 	for {
 		select {
 		case <-changeCh:
 			{
+				fmt.Println("app change")
+
 				for j := 0; j < channelCount; j++ {
 					quit <- 0
 				}
@@ -123,15 +141,15 @@ func Run(ts *tags.TagsHandler) {
 					if err != nil {
 						fmt.Println(err)
 					}
-					for tagId := range appConfig.clients[clientId].GetTags() {
-						go startSender(appConfig.clients[clientId], clientId, tagId, quit, ts)
+					for tagId := range appConfig.clients[clientId].Tags() {
+						go startSender(appConfig.clients[clientId], clientId, tagId, quit, th)
 						channelCount++
 					}
 				}
 			}
 		default:
-			time.Sleep(10 * time.Second)
-			ts.Save()
+			time.Sleep(2 * time.Second)
+			th.Save()
 		}
 
 	}
