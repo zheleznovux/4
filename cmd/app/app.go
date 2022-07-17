@@ -19,27 +19,26 @@ type AppConfigMgr struct {
 }
 
 var appConfigMgr = &AppConfigMgr{}
-var changeCh chan int
+var changeCh chan int = make(chan int)
 
 func (a *AppConfigMgr) Callback(conf *configuration.ConfigHandler) {
 	appConfig := &AppConfig{}
 	appConfig.clients = setup(conf)
-	fmt.Println(appConfig.clients)
+	appConfigMgr.config.Store(appConfig)
 
 	changeCh <- 1
-	appConfigMgr.config.Store(appConfig)
 }
 
+// инициализация клиентов из конфигурационного файла
 func setup(ch *configuration.ConfigHandler) []modbus.Client {
-
 	config := ch.GetConfig()
 	rtn := make([]modbus.Client, 0)
 
 	var err error
-	nodes := config.(*configuration.ConfigurationDataNode).NODES
+	nodes := config.(*configuration.ConfigurationDataApp).NODES
 	for i := range nodes {
 		var tmp modbus.Client
-		tmp, err = modbus.NewClinet(nodes[i].IP, nodes[i].Port, nodes[i].ID, nodes[i].Name)
+		tmp, err = modbus.NewClinet(nodes[i].IP, nodes[i].Port, nodes[i].ID, nodes[i].Name, nodes[i].Debug, int(nodes[i].ConnectionAttempts), nodes[i].ConnectionTimeout)
 		if err != nil {
 			fmt.Println(err)
 			continue
@@ -50,8 +49,7 @@ func setup(ch *configuration.ConfigHandler) []modbus.Client {
 				nodes[i].TAGS[j].Name,
 				nodes[i].TAGS[j].Address,
 				nodes[i].TAGS[j].ScanPeriod,
-				nodes[i].TAGS[j].DataType,
-				nodes[i].TAGS[j].DataBit)
+				nodes[i].TAGS[j].DataType)
 
 			if err != nil {
 				fmt.Println(err)
@@ -83,15 +81,17 @@ func InitConfig(file string, th *tags.TagsHandler) {
 	fmt.Println("Выполнена загрузка конфигурации тэгов")
 }
 
-func startSender(client modbus.Client, clientId int, tagId int, quit chan int, th *tags.TagsHandler) {
-	fmt.Println("Запущен опрос тега " + client.Name() + "." + client.Tags()[tagId].GetName())
-
+func startSender(client modbus.Client, clientId int, tagId int, quit chan int, counter *int, th *tags.TagsHandler) {
+	fmt.Println("Запущен опрос тега " + client.Name() + "." + client.Tags()[tagId].Name())
 	for {
 		select {
 		case <-quit:
 			{
+				*counter--
+				fmt.Println("Завершен опрос тега " + client.Name() + "." + client.Tags()[tagId].Name())
 				return
 			}
+
 		default:
 			{
 				err := client.Send(tagId)
@@ -100,51 +100,50 @@ func startSender(client modbus.Client, clientId int, tagId int, quit chan int, t
 				} else {
 					th.SetDataTag(clientId, tagId, &client.Tags()[tagId])
 				}
-				time.Sleep(time.Duration(client.Tags()[tagId].GetScanPeriod()) * time.Second)
-
+				// fmt.Printf("%s.%s = %d\n", client.Name(), client.Tags()[tagId].Name(), client.Tags()[tagId].Value())
+				time.Sleep(time.Duration(client.Tags()[tagId].ScanPeriod()) * time.Second)
 			}
 		}
 
 	}
 }
 
-// func tryConnect() {
-// 	for {
-// 		err := appConfig.clients[clientId].Connect()
-// 		if err != nil {
-// 			continue
-// 		}
-// 	}
-
-// }
-
 func Run(th *tags.TagsHandler) {
 	var channelCount int
-	appConfig := appConfigMgr.config.Load().(*AppConfig)
 
 	quit := make(chan int)
-	changeCh = make(chan int)
 
 	for {
+		// сигнал смены конфига
 		select {
 		case <-changeCh:
 			{
 				fmt.Println("app change")
 
-				for j := 0; j < channelCount; j++ {
+				appConfig := appConfigMgr.config.Load().(*AppConfig)
+
+				for j := 0; j != channelCount; {
 					quit <- 0
 				}
 				channelCount = 0
 
 				for clientId := range appConfig.clients {
-					err := appConfig.clients[clientId].Connect()
-					if err != nil {
-						fmt.Println(err)
-					}
-					for tagId := range appConfig.clients[clientId].Tags() {
-						go startSender(appConfig.clients[clientId], clientId, tagId, quit, th)
-						channelCount++
-					}
+					go func(clientId int) {
+						for i := 0; i < appConfig.clients[clientId].ConnectionAttempts(); i++ {
+							err := appConfig.clients[clientId].Connect()
+							if err != nil {
+								fmt.Println(err.Error() + " в узле " + appConfig.clients[clientId].Name())
+							} else {
+								for tagId := range appConfig.clients[clientId].Tags() {
+									go startSender(appConfig.clients[clientId], clientId, tagId, quit, &channelCount, th)
+									channelCount++
+								}
+								return
+							}
+							time.Sleep(appConfig.clients[clientId].ConnectionTimeout())
+						}
+						fmt.Println("Достигнуто максимальное количество попыток подключения в узле " + appConfig.clients[clientId].Name())
+					}(clientId)
 				}
 			}
 		default:
@@ -153,5 +152,4 @@ func Run(th *tags.TagsHandler) {
 		}
 
 	}
-
 }

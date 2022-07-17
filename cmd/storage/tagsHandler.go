@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"zheleznovux.com/modbus-console/cmd/configuration"
+	"zheleznovux.com/modbus-console/cmd/constants"
 )
 
 var _ configuration.Notifyer = (nil)
@@ -20,7 +21,7 @@ type TagsHandler struct {
 
 type StateNode struct {
 	Name string
-	Tags []BaseTag
+	Tags []TagInterface
 }
 
 func New() *TagsHandler {
@@ -29,33 +30,44 @@ func New() *TagsHandler {
 
 func Setup(confHandler *configuration.ConfigHandler) []StateNode {
 	t := make([]StateNode, 0)
-	conf := confHandler.GetConfig().(*configuration.ConfigurationDataNode)
+	conf := confHandler.GetConfig().(*configuration.ConfigurationDataApp)
 	for i := range conf.NODES {
 		var sn StateNode
 		sn.Name = conf.NODES[i].Name
 		for j := range conf.NODES[i].TAGS {
 			switch conf.NODES[i].TAGS[j].DataType {
-			case "coil":
+			case constants.COIL_TYPE: //завернуть в коснтурктор!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 				{
 					var bt CoilTag
 					bt.SetName(conf.NODES[i].TAGS[j].Name)
 					bt.SetAddress(conf.NODES[i].TAGS[j].Address)
-					bt.SetDataType(conf.NODES[i].TAGS[j].DataType)
+					bt.SetDataType()
 					bt.SetScanPeriod(conf.NODES[i].TAGS[j].ScanPeriod)
-					bt.SetBit(conf.NODES[i].TAGS[j].DataBit)
 					bt.SetState(false)
 					sn.Tags = append(sn.Tags, &bt)
 				}
-			default:
+			case constants.WORD_TYPE:
 				{
 					var bt WordTag
 					bt.SetName(conf.NODES[i].TAGS[j].Name)
 					bt.SetAddress(conf.NODES[i].TAGS[j].Address)
-					bt.SetDataType(conf.NODES[i].TAGS[j].DataType)
+					bt.SetDataType()
 					bt.SetScanPeriod(conf.NODES[i].TAGS[j].ScanPeriod)
 					bt.SetState(false)
 					sn.Tags = append(sn.Tags, &bt)
 				}
+			case constants.DWORD_TYPE:
+				{
+					var bt DWordTag
+					bt.SetName(conf.NODES[i].TAGS[j].Name)
+					bt.SetAddress(conf.NODES[i].TAGS[j].Address)
+					bt.SetDataType()
+					bt.SetScanPeriod(conf.NODES[i].TAGS[j].ScanPeriod)
+					bt.SetState(false)
+					sn.Tags = append(sn.Tags, &bt)
+				}
+			default:
+				continue
 			}
 
 		}
@@ -77,7 +89,7 @@ func (ts *TagsHandler) GetData() []StateNode {
 	return ts.data
 }
 
-func (ts *TagsHandler) GetTagByName(name string) (BaseTag, error) {
+func (ts *TagsHandler) GetTagByName(name string) (TagInterface, error) {
 
 	split := strings.Split(name, ".")
 	if len(split) != 2 {
@@ -90,7 +102,7 @@ func (ts *TagsHandler) GetTagByName(name string) (BaseTag, error) {
 	for i := range ts.data {
 		if ts.data[i].Name == split[0] {
 			for j := range ts.data[i].Tags {
-				if ts.data[i].Tags[j].GetName() == split[1] {
+				if ts.data[i].Tags[j].Name() == split[1] {
 					return ts.data[i].Tags[j], nil
 				}
 			}
@@ -99,7 +111,7 @@ func (ts *TagsHandler) GetTagByName(name string) (BaseTag, error) {
 	return nil, fmt.Errorf("no such name")
 }
 
-func (ts *TagsHandler) SetDataTag(clientId int, tagId int, tag *BaseTag) {
+func (ts *TagsHandler) SetDataTag(clientId int, tagId int, tag *TagInterface) {
 	ts.rwLock.RLock()
 	defer ts.rwLock.RUnlock()
 	ts.data[clientId].Tags[tagId] = *tag
@@ -118,12 +130,12 @@ func (ts *TagsHandler) Save() {
 
 	rankingsJson, err := json.Marshal(ts.data)
 	if err != nil {
-		fmt.Printf(err.Error())
+		fmt.Println(err.Error())
 		return
 	}
 	err = ioutil.WriteFile("output.json", rankingsJson, 0644)
 	if err != nil {
-		fmt.Printf(err.Error())
+		fmt.Println(err.Error())
 		return
 	}
 }

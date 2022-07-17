@@ -8,29 +8,38 @@ import (
 	"time"
 )
 
-type ConfigurationData interface{}
-
-type ConfigHandler struct {
-	data           ConfigurationData
-	fileName       string
-	lastModifyTime int64
-	rwLock         sync.RWMutex
-	notifyList     []Notifyer
+// абстрактный класс, наследуемый ConfigurationDataApp и ConfigurationDataWin
+type ConfigurationData interface {
+	Setup(*ConfigHandler) error // метод, выполняющий верификацию полученных данных
 }
 
+type ConfigHandler struct {
+	data           ConfigurationData // верифицированные данные из файла filename
+	fileName       string            // имя файла с конифгурацией
+	lastModifyTime int64             // время последней модификации файла, необходимо для горячей подгрузки конфигурации (reload())
+	rwLock         sync.RWMutex      // синхронизация
+	notifyList     []Notifyer        // массив классов обработчиков data
+}
+
+// обертка для выбора типа ConfigurationData и вызова Setup
 func (c *ConfigHandler) parse() (ConfigurationData, error) {
 	var tmpСonf ConfigurationData
 	if strings.Contains(c.fileName, "win_") {
-		tmpСonf = &ConfigurationDataTagNode{}
-		tmpСonf.(*ConfigurationDataTagNode).Setup(c)
+		tmpСonf = &ConfigurationDataWin{}
+		if err := tmpСonf.(*ConfigurationDataWin).Setup(c); err != nil {
+			return nil, err
+		}
 	} else {
-		tmpСonf = &ConfigurationDataNode{}
-		tmpСonf.(*ConfigurationDataNode).Setup(c)
+		tmpСonf = &ConfigurationDataApp{}
+		if err := tmpСonf.(*ConfigurationDataApp).Setup(c); err != nil {
+			return nil, err
+		}
 	}
 
 	return tmpСonf, nil
 }
 
+// конструктор
 func NewConfig(fileName string) (conf *ConfigHandler, err error) {
 
 	conf = &ConfigHandler{
@@ -40,7 +49,7 @@ func NewConfig(fileName string) (conf *ConfigHandler, err error) {
 	m, err := conf.parse()
 	if err != nil {
 		fmt.Printf("parse conf error:%v\n", err)
-		return
+		return nil, err
 	}
 
 	conf.rwLock.Lock()
@@ -60,7 +69,7 @@ func (c *ConfigHandler) GetConfig() ConfigurationData {
 func (c *ConfigHandler) reload() {
 	ticker := time.NewTicker(time.Second * 5)
 
-	for _ = range ticker.C {
+	for range ticker.C {
 
 		func() {
 			f, err := os.Open(c.fileName)
@@ -98,6 +107,7 @@ func (c *ConfigHandler) reload() {
 	}
 }
 
+// добавить смотрителя, реализующего класс Notifyer
 func (c *ConfigHandler) AddObserver(n Notifyer) {
 	c.notifyList = append(c.notifyList, n)
 }

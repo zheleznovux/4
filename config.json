@@ -5,19 +5,21 @@
         "IP": "127.0.0.1",
         "port":502,
         "ID":1,
+        "Debug": false,
+        "ConnectionTimeout": 5,
+        "ConnectionAttempts": 10,
         "TAGS": [
             {
                 "name": "testTag1",
-                "address":"0001",
-                "dataType": "word",
-                "scanPeriod":5.5
+                "address":1,
+                "dataType": "dword",
+                "scanPeriod":1
             },
             {
                 "name": "testTag2",
-                "address":"0004",
+                "address":4,
                 "dataType": "coil",
-                "scanPeriod":5.5,
-                "dataBit": 1
+                "scanPeriod":5.5
             }
         ]
     },
@@ -26,16 +28,19 @@
         "IP": "192.168.127.254",
         "port":502,
         "ID":1,
+        "Debug": false,
+        "ConnectionTimeout": 1,
+        "ConnectionAttempts": 10,
         "TAGS": [
             {
                 "name": "testTag1",
-                "address":"30001",
+                "address":1,
                 "dataType": "word",
                 "scanPeriod":4.5
             },
             {
                 "name": "testTag2",
-                "address":"30002",
+                "address":2,
                 "dataType": "coil",
                 "scanPeriod":7.5,
                 "dataBit": 1

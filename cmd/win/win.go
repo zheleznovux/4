@@ -19,16 +19,13 @@ type WinConfigMgr struct {
 }
 
 var winConfigMgr = &WinConfigMgr{}
-var changeChannel chan int
+var changeCh chan int = make(chan int)
 
 func (a *WinConfigMgr) Callback(conf *configuration.ConfigHandler) {
 	winConfig := &WinConfig{}
-	winConfig.nodeCommand = conf.GetConfig().(*configuration.ConfigurationDataTagNode).NODES
-	fmt.Println(winConfig.nodeCommand)
-	changeChannel <- 1
-	fmt.Println("callback12")
-
+	winConfig.nodeCommand = conf.GetConfig().(*configuration.ConfigurationDataWin).NODES
 	winConfigMgr.config.Store(winConfig)
+	changeCh <- 1
 }
 
 func InitConfig(file string) {
@@ -41,7 +38,7 @@ func InitConfig(file string) {
 	conf.AddObserver(winConfigMgr)
 
 	var winConfig WinConfig
-	winConfig.nodeCommand = conf.GetConfig().(*configuration.ConfigurationDataTagNode).NODES
+	winConfig.nodeCommand = conf.GetConfig().(*configuration.ConfigurationDataWin).NODES
 
 	winConfigMgr.config.Store(&winConfig)
 	fmt.Println("Выполнена загрузка конфигурации команд")
@@ -51,12 +48,11 @@ func Run(th *tags.TagsHandler) {
 	winConfig := winConfigMgr.config.Load().(*WinConfig)
 	var channelCount int
 	quit := make(chan int)
-	changeChannel = make(chan int)
 
 	fmt.Println("Запущен обработчик")
 	for {
 		select {
-		case <-changeChannel:
+		case <-changeCh:
 			{
 				for j := 0; j < channelCount; j++ {
 					quit <- 1

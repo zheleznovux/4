@@ -1,9 +1,9 @@
 {"NODES":[
     {
         "name":"testNode1.testTag1",
-        "dataType": "word",
+        "dataType": "dword",
         "stateCondition" : "good",
-        "valueCondition" : ">=10",
+        "valueCondition" : "bit(32)",
         "logic": "and",
         "action": "shutdown",
         "actionTimeout": 20,
