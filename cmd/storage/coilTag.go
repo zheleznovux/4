@@ -2,7 +2,7 @@ package tags
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"strings"
 	"time"
 
@@ -17,6 +17,25 @@ type CoilTag struct { //не могу заприватить из-за json па
 	value      byte
 	timestamp  string
 	state      bool
+}
+
+func (ct *CoilTag) Setup(name string, address uint16, scanPeriod float64) error {
+	var err error
+	err = ct.SetName(name)
+	if err != nil {
+		return err
+	}
+	err = ct.SetAddress(address)
+	if err != nil {
+		return err
+	}
+	ct.SetDataType()
+	err = ct.SetScanPeriod(scanPeriod)
+	if err != nil {
+		return err
+	}
+	ct.SetState(false)
+	return nil
 }
 
 func (ct CoilTag) MarshalJSON() ([]byte, error) {
@@ -38,10 +57,15 @@ func (ct CoilTag) MarshalJSON() ([]byte, error) {
 }
 
 //===================================Name
-func (t *CoilTag) SetName(name string) {
-	t.name = strings.TrimSpace(name)
+func (t *CoilTag) SetName(name string) error {
+	tmp := strings.TrimSpace(name)
+	if tmp == "" {
+		return errors.New("empty tag name")
+	}
+	t.name = tmp
+	return nil
 }
-func (t *CoilTag) Name() string {
+func (t CoilTag) Name() string {
 	return t.name
 }
 
@@ -49,27 +73,31 @@ func (t *CoilTag) Name() string {
 func (t *CoilTag) SetDataType() {
 	t.dataType = constants.COIL_TYPE
 }
-func (t *CoilTag) DataType() string {
+func (t CoilTag) DataType() string {
 	return t.dataType
 }
 
 //===================================Address
-func (t *CoilTag) SetAddress(address uint16) {
+func (t *CoilTag) SetAddress(address uint16) error {
+	if address == 0xFF {
+		return errors.New("address == 0xFF")
+	}
 	t.address = address
+	return nil
 }
-func (t *CoilTag) Address() uint16 {
+func (t CoilTag) Address() uint16 {
 	return t.address
 }
 
 //===================================ScanPeriod
 func (t *CoilTag) SetScanPeriod(time float64) error {
 	if time < 0 {
-		return fmt.Errorf("time < 0")
+		return errors.New("time < 0")
 	}
 	t.scanPeriod = time
 	return nil
 }
-func (t *CoilTag) ScanPeriod() float64 {
+func (t CoilTag) ScanPeriod() float64 {
 	return t.scanPeriod
 }
 
@@ -79,7 +107,7 @@ func (t *CoilTag) SetValue(value byte) {
 	t.SetState(true)
 	t.value = value
 }
-func (t *CoilTag) Value() byte {
+func (t CoilTag) Value() byte {
 	return t.value
 }
 
@@ -88,7 +116,7 @@ func (t *CoilTag) SetTimestamp() {
 	now := time.Now()
 	t.timestamp = now.Format(time.RFC3339)
 }
-func (t *CoilTag) Timestamp() string {
+func (t CoilTag) Timestamp() string {
 	return t.timestamp
 }
 
@@ -96,6 +124,6 @@ func (t *CoilTag) Timestamp() string {
 func (t *CoilTag) SetState(state bool) {
 	t.state = state
 }
-func (t *CoilTag) State() bool {
+func (t CoilTag) State() bool {
 	return t.state
 }

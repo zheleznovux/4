@@ -2,6 +2,7 @@ package tags
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -19,7 +20,26 @@ type DWordTag struct {
 	state      bool
 }
 
-func (wc DWordTag) MarshalJSON() ([]byte, error) {
+func (dwt *DWordTag) Setup(name string, address uint16, scanPeriod float64) error {
+	var err error
+	err = dwt.SetName(name)
+	if err != nil {
+		return err
+	}
+	err = dwt.SetAddress(address)
+	if err != nil {
+		return err
+	}
+	dwt.SetDataType()
+	err = dwt.SetScanPeriod(scanPeriod)
+	if err != nil {
+		return err
+	}
+	dwt.SetState(false)
+	return nil
+}
+
+func (dwt DWordTag) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Name      string
 		DataType  string
@@ -28,74 +48,83 @@ func (wc DWordTag) MarshalJSON() ([]byte, error) {
 		Timestamp string
 		State     bool
 	}{
-		Name:      wc.name,
-		DataType:  wc.dataType,
-		Address:   wc.address,
-		Value:     wc.value,
-		Timestamp: wc.timestamp,
-		State:     wc.state,
+		Name:      dwt.name,
+		DataType:  dwt.dataType,
+		Address:   dwt.address,
+		Value:     dwt.value,
+		Timestamp: dwt.timestamp,
+		State:     dwt.state,
 	})
 }
 
 //===================================Name
-func (t *DWordTag) SetName(name string) {
-	t.name = strings.TrimSpace(name)
+func (dwt *DWordTag) SetName(name string) error {
+	tmp := strings.TrimSpace(name)
+	if tmp == "" {
+		return errors.New("empty tag name")
+	}
+	dwt.name = tmp
+	return nil
 }
 func (t *DWordTag) Name() string {
 	return t.name
 }
 
 //===================================DataType
-func (t *DWordTag) SetDataType() {
-	t.dataType = constants.DWORD_TYPE
+func (dwt *DWordTag) SetDataType() {
+	dwt.dataType = constants.DWORD_TYPE
 }
-func (t *DWordTag) DataType() string {
-	return t.dataType
+func (dwt *DWordTag) DataType() string {
+	return dwt.dataType
 }
 
 //===================================Address
-func (t *DWordTag) Address() uint16 {
-	return t.address
+func (dwt *DWordTag) Address() uint16 {
+	return dwt.address
 }
-func (t *DWordTag) SetAddress(address uint16) {
-	t.address = address
+func (dwt *DWordTag) SetAddress(address uint16) error {
+	if address == 0xFF {
+		return errors.New("address == 0xFF")
+	}
+	dwt.address = address
+	return nil
 }
 
 //===================================TimeStamp
-func (t *DWordTag) SetTimestamp() {
+func (dwt *DWordTag) SetTimestamp() {
 	now := time.Now()
-	t.timestamp = now.Format(time.RFC3339)
+	dwt.timestamp = now.Format(time.RFC3339)
 }
-func (t *DWordTag) Timestamp() string {
-	return t.timestamp
+func (dwt *DWordTag) Timestamp() string {
+	return dwt.timestamp
 }
 
 //===================================State
-func (t *DWordTag) SetState(state bool) {
-	t.state = state
+func (dwt *DWordTag) SetState(state bool) {
+	dwt.state = state
 }
-func (t *DWordTag) State() bool {
-	return t.state
+func (dwt *DWordTag) State() bool {
+	return dwt.state
 }
 
 //===================================Value не интерфейсный метод
-func (t *DWordTag) SetValue(value uint32) {
-	t.SetTimestamp()
-	t.SetState(true)
-	t.value = value
+func (dwt *DWordTag) SetValue(value uint32) {
+	dwt.SetTimestamp()
+	dwt.SetState(true)
+	dwt.value = value
 }
-func (t *DWordTag) Value() uint32 {
-	return t.value
+func (dwt *DWordTag) Value() uint32 {
+	return dwt.value
 }
 
 //===================================ScanPeriod
-func (t *DWordTag) ScanPeriod() float64 {
-	return t.scanPeriod
+func (dwt *DWordTag) ScanPeriod() float64 {
+	return dwt.scanPeriod
 }
-func (t *DWordTag) SetScanPeriod(time float64) error {
+func (dwt *DWordTag) SetScanPeriod(time float64) error {
 	if time < 0 {
 		return fmt.Errorf("time < 0")
 	}
-	t.scanPeriod = time
+	dwt.scanPeriod = time
 	return nil
 }

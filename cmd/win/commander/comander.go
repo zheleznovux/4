@@ -40,21 +40,21 @@ func makeSecond(t float64) time.Duration {
 func Setup(nt configuration.NodeTag, th *tags.TagsHandler) (CommanderInterface, error) {
 	fmt.Println(nt.DataType)
 	switch nt.DataType {
-	case "word":
+	case constants.WORD_TYPE:
 		{
 			var rtn WordCommander
 			err := rtn.setup(nt, th)
 
 			return &rtn, err
 		}
-	case "coil":
+	case constants.COIL_TYPE:
 		{
 			var rtn CoilCommander
 			err := rtn.setup(nt, th)
 
 			return &rtn, err
 		}
-	case "dword":
+	case constants.DWORD_TYPE:
 		{
 			var rtn DWordCommander
 			err := rtn.setup(nt, th)

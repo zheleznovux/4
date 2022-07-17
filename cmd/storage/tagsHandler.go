@@ -36,34 +36,34 @@ func Setup(confHandler *configuration.ConfigHandler) []StateNode {
 		sn.Name = conf.NODES[i].Name
 		for j := range conf.NODES[i].TAGS {
 			switch conf.NODES[i].TAGS[j].DataType {
-			case constants.COIL_TYPE: //завернуть в коснтурктор!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			case constants.COIL_TYPE:
 				{
 					var bt CoilTag
-					bt.SetName(conf.NODES[i].TAGS[j].Name)
-					bt.SetAddress(conf.NODES[i].TAGS[j].Address)
-					bt.SetDataType()
-					bt.SetScanPeriod(conf.NODES[i].TAGS[j].ScanPeriod)
-					bt.SetState(false)
+					err := bt.Setup(conf.NODES[i].TAGS[j].Name, conf.NODES[i].TAGS[j].Address, conf.NODES[i].TAGS[j].ScanPeriod)
+					if err != nil {
+						fmt.Println(err)
+						continue
+					}
 					sn.Tags = append(sn.Tags, &bt)
 				}
 			case constants.WORD_TYPE:
 				{
 					var bt WordTag
-					bt.SetName(conf.NODES[i].TAGS[j].Name)
-					bt.SetAddress(conf.NODES[i].TAGS[j].Address)
-					bt.SetDataType()
-					bt.SetScanPeriod(conf.NODES[i].TAGS[j].ScanPeriod)
-					bt.SetState(false)
+					err := bt.Setup(conf.NODES[i].TAGS[j].Name, conf.NODES[i].TAGS[j].Address, conf.NODES[i].TAGS[j].ScanPeriod)
+					if err != nil {
+						fmt.Println(err)
+						continue
+					}
 					sn.Tags = append(sn.Tags, &bt)
 				}
 			case constants.DWORD_TYPE:
 				{
 					var bt DWordTag
-					bt.SetName(conf.NODES[i].TAGS[j].Name)
-					bt.SetAddress(conf.NODES[i].TAGS[j].Address)
-					bt.SetDataType()
-					bt.SetScanPeriod(conf.NODES[i].TAGS[j].ScanPeriod)
-					bt.SetState(false)
+					err := bt.Setup(conf.NODES[i].TAGS[j].Name, conf.NODES[i].TAGS[j].Address, conf.NODES[i].TAGS[j].ScanPeriod)
+					if err != nil {
+						fmt.Println(err)
+						continue
+					}
 					sn.Tags = append(sn.Tags, &bt)
 				}
 			default:

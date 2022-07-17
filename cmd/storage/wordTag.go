@@ -2,6 +2,7 @@ package tags
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -17,6 +18,25 @@ type WordTag struct {
 	value      uint16
 	timestamp  string
 	state      bool
+}
+
+func (wt *WordTag) Setup(name string, address uint16, scanPeriod float64) error {
+	var err error
+	err = wt.SetName(name)
+	if err != nil {
+		return err
+	}
+	err = wt.SetAddress(address)
+	if err != nil {
+		return err
+	}
+	wt.SetDataType()
+	err = wt.SetScanPeriod(scanPeriod)
+	if err != nil {
+		return err
+	}
+	wt.SetState(false)
+	return nil
 }
 
 func (wt WordTag) MarshalJSON() ([]byte, error) {
@@ -38,8 +58,13 @@ func (wt WordTag) MarshalJSON() ([]byte, error) {
 }
 
 //===================================Name
-func (t *WordTag) SetName(name string) {
-	t.name = strings.TrimSpace(name)
+func (t *WordTag) SetName(name string) error {
+	tmp := strings.TrimSpace(name)
+	if tmp == "" {
+		return errors.New("empty tag name")
+	}
+	t.name = tmp
+	return nil
 }
 func (t *WordTag) Name() string {
 	return t.name
@@ -57,8 +82,12 @@ func (t *WordTag) DataType() string {
 func (t *WordTag) Address() uint16 {
 	return t.address
 }
-func (t *WordTag) SetAddress(address uint16) {
+func (t *WordTag) SetAddress(address uint16) error {
+	if address == 0xFF {
+		return errors.New("address == 0xFF")
+	}
 	t.address = address
+	return nil
 }
 
 //===================================TimeStamp

@@ -1,10 +1,10 @@
 package tags
 
 type TagInterface interface {
-	SetName(string)
+	SetName(string) error
 	Name() string
 
-	SetAddress(uint16)
+	SetAddress(uint16) error
 	Address() uint16
 
 	SetScanPeriod(float64) error
@@ -21,4 +21,6 @@ type TagInterface interface {
 
 	SetTimestamp()
 	Timestamp() string
+
+	Setup(name string, address uint16, scanPeriod float64) error
 }
