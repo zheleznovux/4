@@ -20,7 +20,7 @@ type WordTag struct {
 	state      bool
 }
 
-func (wt *WordTag) Setup(name string, address uint16, scanPeriod float64) error {
+func (wt *WordTag) Setup(name string, address uint32, scanPeriod float64) error {
 	var err error
 	err = wt.SetName(name)
 	if err != nil {
@@ -82,11 +82,20 @@ func (t *WordTag) DataType() string {
 func (t *WordTag) Address() uint16 {
 	return t.address
 }
-func (t *WordTag) SetAddress(address uint16) error {
-	if address == 0xFF {
-		return errors.New("address == 0xFF")
+func (t *WordTag) SetAddress(address uint32) error {
+	if address >= constants.UINT16_MAX_VALUE {
+		tmpINT := int(address / 100000.0)
+		if (tmpINT != constants.FUNCTION_3) && (tmpINT != constants.FUNCTION_4) {
+			return errors.New("invalid function address")
+		}
+		tmpUINT16 := uint16(address - uint32(tmpINT*100000))
+		if tmpUINT16 >= constants.UINT16_MAX_VALUE {
+			return errors.New("invalid tag address")
+		}
+		t.address = tmpUINT16
+		return nil
 	}
-	t.address = address
+	t.address = uint16(address)
 	return nil
 }
 

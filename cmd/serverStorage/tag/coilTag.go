@@ -9,7 +9,7 @@ import (
 	"zheleznovux.com/modbus-console/cmd/serverStorage/constants"
 )
 
-type CoilTag struct { //не могу заприватить из-за json парса
+type CoilTag struct {
 	name       string
 	dataType   string
 	address    uint16
@@ -19,7 +19,7 @@ type CoilTag struct { //не могу заприватить из-за json па
 	state      bool
 }
 
-func (ct *CoilTag) Setup(name string, address uint16, scanPeriod float64) error {
+func (ct *CoilTag) Setup(name string, address uint32, scanPeriod float64) error {
 	var err error
 	err = ct.SetName(name)
 	if err != nil {
@@ -78,11 +78,20 @@ func (t CoilTag) DataType() string {
 }
 
 //===================================Address
-func (t *CoilTag) SetAddress(address uint16) error {
-	if address == 0xFF {
-		return errors.New("address == 0xFF")
+func (t *CoilTag) SetAddress(address uint32) error {
+	if address >= constants.UINT16_MAX_VALUE {
+		tmpINT := int(address / 100000.0)
+		if (tmpINT != constants.FUNCTION_1) && (tmpINT != constants.FUNCTION_2) {
+			return errors.New("invalid function address")
+		}
+		tmpUINT16 := uint16(address - uint32(tmpINT*100000))
+		if tmpUINT16 >= constants.UINT16_MAX_VALUE {
+			return errors.New("invalid tag address")
+		}
+		t.address = tmpUINT16
+		return nil
 	}
-	t.address = address
+	t.address = uint16(address)
 	return nil
 }
 func (t CoilTag) Address() uint16 {

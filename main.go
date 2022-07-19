@@ -18,7 +18,7 @@ func InitConfig(file string, storageHandler *storage.Server) {
 	}
 
 	conf.AddObserver(storageHandler)
-	storageHandler.SetData(storage.Setup(conf))
+	storageHandler.Setup(conf)
 
 	fmt.Println("Выполнена загрузка конфигурации тэгов")
 }

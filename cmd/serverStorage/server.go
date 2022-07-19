@@ -26,7 +26,7 @@ type Server struct {
 var changeCh chan int = make(chan int)
 
 func (thisSH *Server) Callback(conf *configuration.ConfigHandler) {
-	thisSH.SetData(Setup(conf))
+	thisSH.Setup(conf)
 	fmt.Println(thisSH.data[0])
 	changeCh <- 1
 }
@@ -35,12 +35,11 @@ func New() *Server {
 	return &Server{}
 }
 
-func Setup(confHandler *configuration.ConfigHandler) []client.ClientInterface {
+func (thisSH *Server) Setup(confHandler *configuration.ConfigHandler) {
 	config := confHandler.GetConfig()
 	rtn := make([]client.ClientInterface, 0)
 
 	nodes := config.(*configuration.ConfigurationDataApp).NODES
-	// clienti dobavit' invariant
 	for i := range nodes {
 		var tmp client.ClientInterface
 		switch nodes[i].ConnectionType {
@@ -78,13 +77,9 @@ func Setup(confHandler *configuration.ConfigHandler) []client.ClientInterface {
 		}
 		rtn = append(rtn, tmp)
 	}
-	return rtn
-}
-
-func (thisSH *Server) SetData(sn []client.ClientInterface) {
 	thisSH.rwLock.RLock()
 	defer thisSH.rwLock.RUnlock()
-	thisSH.data = sn
+	thisSH.data = rtn
 }
 
 func (thisSH *Server) GetData() []client.ClientInterface {
@@ -113,15 +108,6 @@ func (thisSH *Server) GetTagByName(name string) (tag.TagInterface, error) {
 		}
 	}
 	return nil, fmt.Errorf("no such name")
-}
-
-func (thisSH *Server) SetDataTag(clientId int, tagId int, tag *tag.TagInterface) {
-	thisSH.rwLock.RLock()
-	defer thisSH.rwLock.RUnlock()
-	thisSH.data[clientId].Tags()[tagId] = *tag
-	if thisSH.Sync {
-		go thisSH.Save()
-	}
 }
 
 func (thisSH *Server) Save() {

@@ -12,7 +12,7 @@
         "TAGS": [
             {
                 "name": "testTag1",
-                "address":0,
+                "address":400003,
                 "dataType": "dword",
                 "scanPeriod":5
             }

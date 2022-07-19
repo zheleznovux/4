@@ -28,7 +28,7 @@ type Node struct {
 
 type Tag struct {
 	Name       string
-	Address    uint16
+	Address    uint32
 	DataType   string
 	ScanPeriod float64
 }
@@ -212,9 +212,9 @@ func verifyNodeConnectionAttempts(ca uint) (uint, error) {
 ///функции выполняющте верификацию полученных данных NODE -----}
 
 ///функции выполняющте верификацию полученных данных для тега TAG -----{
-func verifyTagAddress(address uint16) (uint16, error) {
-	if address == 0xFF {
-		return address, fmt.Errorf("config address >= 0xFF")
+func verifyTagAddress(address uint32) (uint32, error) {
+	if address == 0xFFFFFFFF {
+		return address, fmt.Errorf("config address >= 0xFFFF")
 	}
 	return address, nil
 }

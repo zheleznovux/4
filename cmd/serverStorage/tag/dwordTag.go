@@ -20,7 +20,7 @@ type DWordTag struct {
 	state      bool
 }
 
-func (dwt *DWordTag) Setup(name string, address uint16, scanPeriod float64) error {
+func (dwt *DWordTag) Setup(name string, address uint32, scanPeriod float64) error {
 	var err error
 	err = dwt.SetName(name)
 	if err != nil {
@@ -82,11 +82,20 @@ func (dwt *DWordTag) DataType() string {
 func (dwt *DWordTag) Address() uint16 {
 	return dwt.address
 }
-func (dwt *DWordTag) SetAddress(address uint16) error {
-	if address == 0xFF {
-		return errors.New("address == 0xFF")
+func (dwt *DWordTag) SetAddress(address uint32) error {
+	if address >= constants.UINT16_MAX_VALUE {
+		tmpINT := int(address / 100000.0)
+		if (tmpINT != constants.FUNCTION_3) && (tmpINT != constants.FUNCTION_4) {
+			return errors.New("invalid function address")
+		}
+		tmpUINT16 := uint16(address - uint32(tmpINT*100000))
+		if tmpUINT16 >= constants.UINT16_MAX_VALUE {
+			return errors.New("invalid tag address")
+		}
+		dwt.address = tmpUINT16
+		return nil
 	}
-	dwt.address = address
+	dwt.address = uint16(address)
 	return nil
 }
 

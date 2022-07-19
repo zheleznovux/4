@@ -227,6 +227,7 @@ func (c *ClientModbus) Send(id int) error {
 		c.tags[id].SetState(false)
 		return errors.New("sender nil")
 	}
+
 	//новые типы должны быть указаны здесь
 	switch c.tags[id].DataType() {
 	case constants.COIL_TYPE:
@@ -306,8 +307,6 @@ func (c ClientModbus) Start(stop chan struct{}, wg *sync.WaitGroup) {
 			{
 				close(quit)
 				wgi.Wait()
-				fmt.Printf("wgi: %v\n", wgi)
-
 				return
 			}
 		case cb := <-connection: // канал снизу. Плохое подключение => реконект

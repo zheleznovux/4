@@ -2,6 +2,7 @@ package tag
 
 import (
 	"errors"
+	"fmt"
 
 	"zheleznovux.com/modbus-console/cmd/serverStorage/constants"
 )
@@ -10,7 +11,7 @@ type TagInterface interface {
 	SetName(string) error
 	Name() string
 
-	SetAddress(uint16) error
+	SetAddress(uint32) error
 	Address() uint16
 
 	SetScanPeriod(float64) error
@@ -25,10 +26,10 @@ type TagInterface interface {
 	SetTimestamp()
 	Timestamp() string
 
-	Setup(name string, address uint16, scanPeriod float64) error
+	Setup(name string, address uint32, scanPeriod float64) error
 }
 
-func NewTag(name string, address uint16, scanPeriod float64, dataType string) (TagInterface, error) {
+func NewTag(name string, address uint32, scanPeriod float64, dataType string) (TagInterface, error) {
 	var tagI TagInterface
 	if dataType == "" {
 		return nil, errors.New("invalid dataType {constructor tag}")
@@ -57,6 +58,6 @@ func NewTag(name string, address uint16, scanPeriod float64, dataType string) (T
 	if err != nil {
 		return nil, err
 	}
-
+	fmt.Println(tagI)
 	return tagI, nil
 }
