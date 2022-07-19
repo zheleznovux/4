@@ -4,16 +4,18 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"zheleznovux.com/modbus-console/cmd/configuration"
-	"zheleznovux.com/modbus-console/cmd/constants"
-	tags "zheleznovux.com/modbus-console/cmd/storage"
+	"zheleznovux.com/modbus-console/cmd/serverStorage/constants"
+
+	tags "zheleznovux.com/modbus-console/cmd/serverStorage"
 )
 
 type CommanderInterface interface {
-	setup(configuration.NodeTag, *tags.TagsHandler) error
-	StartChecking(chan int)
+	setup(configuration.NodeTag, *tags.Server) error
+	StartChecking(chan int, *sync.WaitGroup)
 	checkLogic(bool, bool) bool
 	Name() string
 }
@@ -37,8 +39,7 @@ func makeSecond(t float64) time.Duration {
 	return time.Duration(t * float64(time.Second))
 }
 
-func Setup(nt configuration.NodeTag, th *tags.TagsHandler) (CommanderInterface, error) {
-	fmt.Println(nt.DataType)
+func Setup(nt configuration.NodeTag, th *tags.Server) (CommanderInterface, error) {
 	switch nt.DataType {
 	case constants.WORD_TYPE:
 		{
@@ -69,10 +70,6 @@ func Setup(nt configuration.NodeTag, th *tags.TagsHandler) (CommanderInterface, 
 func command(c string) error {
 	var flag string
 	exe := strings.Split(c, " ")
-
-	for i := range exe {
-		fmt.Println(exe[i])
-	}
 
 	switch exe[0] {
 	case constants.SHUTDOWN:

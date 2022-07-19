@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"zheleznovux.com/modbus-console/cmd/constants"
+	"zheleznovux.com/modbus-console/cmd/serverStorage/constants"
 )
 
 type ConfigurationDataWin struct {

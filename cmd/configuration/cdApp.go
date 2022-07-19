@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"zheleznovux.com/modbus-console/cmd/constants"
+	"zheleznovux.com/modbus-console/cmd/serverStorage/constants"
 )
 
 type ConfigurationDataApp struct {
@@ -16,6 +16,7 @@ type ConfigurationDataApp struct {
 
 type Node struct {
 	Name               string
+	ConnectionType     string
 	IP                 string
 	Port               int
 	ID                 uint8
@@ -71,6 +72,13 @@ func (tn *ConfigurationDataApp) Setup(c *ConfigHandler) error {
 				fmt.Println("App config: Node skipped Name: " + tmpTN.NODES[i].Name + " because " + err.Error())
 				continue
 			}
+
+			tmpNode.ConnectionType, err = verifyConnectionType(tmpTN.NODES[i].ConnectionType)
+			if err != nil {
+				fmt.Println("App config: Node skipped Name: " + tmpTN.NODES[i].Name + " because " + err.Error())
+				continue
+			}
+
 			tmpNode.ID, err = verifyNodeID(tmpTN.NODES[i].ID)
 			if err != nil {
 				fmt.Println("App config: Node skipped Name: " + tmpTN.NODES[i].Name + " because " + err.Error())
@@ -155,6 +163,15 @@ func verifyName(name string) (string, error) { // эта функция такж
 	return rtn, nil
 }
 
+func verifyConnectionType(ct string) (string, error) {
+	rtn := strings.TrimSpace(ct)
+
+	if rtn == "" {
+		return rtn, fmt.Errorf("config did not have connection type")
+	}
+	return rtn, nil
+}
+
 func verifyNodeIP(ip string) (string, error) {
 	ipAddr := net.ParseIP(strings.TrimSpace(ip))
 
@@ -196,8 +213,8 @@ func verifyNodeConnectionAttempts(ca uint) (uint, error) {
 
 ///функции выполняющте верификацию полученных данных для тега TAG -----{
 func verifyTagAddress(address uint16) (uint16, error) {
-	if address == 0 {
-		return address, fmt.Errorf("config did not have address")
+	if address == 0xFF {
+		return address, fmt.Errorf("config address >= 0xFF")
 	}
 	return address, nil
 }

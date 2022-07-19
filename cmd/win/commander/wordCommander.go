@@ -6,11 +6,14 @@ import (
 	"math"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"zheleznovux.com/modbus-console/cmd/configuration"
-	"zheleznovux.com/modbus-console/cmd/constants"
-	tags "zheleznovux.com/modbus-console/cmd/storage"
+	"zheleznovux.com/modbus-console/cmd/serverStorage/constants"
+
+	storage "zheleznovux.com/modbus-console/cmd/serverStorage"
+	"zheleznovux.com/modbus-console/cmd/serverStorage/tag"
 )
 
 type WordCommander struct {
@@ -21,7 +24,7 @@ type WordCommander struct {
 	action         string
 	actionTimeout  time.Duration
 	scanPeriod     time.Duration
-	th_ptr         *tags.TagsHandler
+	th_ptr         *storage.Server
 }
 
 type wordCondition struct {
@@ -54,7 +57,7 @@ func (wc *WordCommander) makeWordValueCondition(s string) error {
 	return nil
 }
 
-func (wc *WordCommander) setup(nt configuration.NodeTag, th *tags.TagsHandler) error {
+func (wc *WordCommander) setup(nt configuration.NodeTag, th *storage.Server) error {
 	wc.name = nt.Name
 	var err error
 	if nt.Name == "" {
@@ -110,7 +113,7 @@ func (wc *WordCommander) startCommand() {
 	}
 }
 
-func (wc *WordCommander) checkValue(ct *tags.WordTag) bool {
+func (wc *WordCommander) checkValue(ct *tag.WordTag) bool {
 	condition := true
 	for i := range wc.wordConditions {
 		switch wc.wordConditions[i].operator {
@@ -137,25 +140,33 @@ func (wc *WordCommander) checkValue(ct *tags.WordTag) bool {
 	return condition
 }
 
-func (wc *WordCommander) StartChecking(quit chan int) {
+func (wc *WordCommander) StartChecking(quit chan int, wg *sync.WaitGroup) {
+	fmt.Println("запущен wc")
+	defer wg.Done()
+	defer fmt.Println("прекращен wc")
+
 	for {
 		select {
+		case <-quit:
+			{
+				return
+			}
 		default:
 			{
 				wt, err := wc.th_ptr.GetTagByName(wc.Name())
 				if err != nil {
+					fmt.Println(wc.Name() + " " + err.Error())
 					return
 				}
-				fmt.Println(wt)
-				op1 := wc.checkValue(wt.(*tags.WordTag))
-				if wc.checkLogic(op1, wt.(*tags.WordTag).State()) {
+				op1 := wc.checkValue(wt.(*tag.WordTag))
+				if wc.checkLogic(op1, wt.(*tag.WordTag).State()) {
 					wc.startCommand()
 				}
+				time.Sleep(wc.scanPeriod)
+
 			}
-		case <-quit:
-			return
+
 		}
-		time.Sleep(wc.scanPeriod)
 	}
 }
 

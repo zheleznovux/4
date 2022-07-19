@@ -4,11 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"zheleznovux.com/modbus-console/cmd/configuration"
-	"zheleznovux.com/modbus-console/cmd/constants"
-	tags "zheleznovux.com/modbus-console/cmd/storage"
+	storage "zheleznovux.com/modbus-console/cmd/serverStorage"
+	"zheleznovux.com/modbus-console/cmd/serverStorage/constants"
+	"zheleznovux.com/modbus-console/cmd/serverStorage/tag"
 )
 
 type CoilCommander struct {
@@ -19,10 +21,10 @@ type CoilCommander struct {
 	action         string
 	actionTimeout  time.Duration
 	scanPeriod     time.Duration
-	th_ptr         *tags.TagsHandler
+	th_ptr         *storage.Server
 }
 
-func (wc *CoilCommander) setup(nt configuration.NodeTag, th *tags.TagsHandler) error {
+func (wc *CoilCommander) setup(nt configuration.NodeTag, th *storage.Server) error {
 	wc.name = nt.Name
 	var err error
 
@@ -68,28 +70,35 @@ func (wc *CoilCommander) Name() string {
 	return wc.name
 }
 
-func (cc *CoilCommander) StartChecking(quit chan int) {
+func (cc *CoilCommander) StartChecking(quit chan int, wg *sync.WaitGroup) {
+	fmt.Println("запущен cc")
+	defer wg.Done()
+	defer fmt.Println("прекращен cc")
+
 	for {
 		select {
+		case <-quit:
+			{
+				return
+			}
 		default:
 			{
 				ct, err := cc.th_ptr.GetTagByName(cc.Name())
 				if err != nil {
+					fmt.Println(cc.Name() + " " + err.Error())
 					return
 				}
-				op1 := cc.checkValue(ct.(*tags.CoilTag))
-				if cc.checkLogic(op1, ct.(*tags.CoilTag).State()) {
+				op1 := cc.checkValue(ct.(*tag.CoilTag))
+				if cc.checkLogic(op1, ct.(*tag.CoilTag).State()) {
 					cc.startCommand()
 				}
+				time.Sleep(cc.scanPeriod)
 			}
-		case <-quit:
-			return
 		}
-		time.Sleep(cc.scanPeriod)
 	}
 }
 
-func (cc *CoilCommander) checkValue(ct *tags.CoilTag) bool {
+func (cc *CoilCommander) checkValue(ct *tag.CoilTag) bool {
 	return (ct.Value() == 1) == cc.valueCondition
 }
 

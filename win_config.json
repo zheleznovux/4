@@ -3,40 +3,10 @@
         "name":"testNode1.testTag1",
         "dataType": "dword",
         "stateCondition" : "good",
-        "valueCondition" : "bit(32)",
-        "logic": "and",
-        "action": "shutdown",
-        "actionTimeout": 20,
-        "scanPeriod": 5
-    },
-    {
-        "name":"testNode1.testTag2",
-        "dataType": "coil",
-        "stateCondition" : "good",
-        "valueCondition" : "true",
+        "valueCondition" : "bit(1)",
         "logic": "and",
         "action": "run __debug_bin.exe",
         "actionTimeout": 20,
-        "scanPeriod": 5
-    },
-    {
-        "name":"testNode2.testTag1",
-        "dataType": "word",
-        "stateCondition" : "good",
-        "valueCondition" : ">=10",
-        "logic": "and",
-        "action": "restart",
-        "actionTimeout": 10,
-        "scanPeriod": 5
-    },
-    {
-        "name":"testNode2.testTag2",
-        "dataType": "coil",
-        "stateCondition" : "good",
-        "valueCondition" : "false",
-        "logic": "and",
-        "action": "restart",
-        "actionTimeout": 10,
         "scanPeriod": 5
     }
 ]}

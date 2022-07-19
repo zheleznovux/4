@@ -2,11 +2,11 @@ package win
 
 import (
 	"fmt"
+	"sync"
 	"sync/atomic"
-	"time"
 
 	configuration "zheleznovux.com/modbus-console/cmd/configuration"
-	tags "zheleznovux.com/modbus-console/cmd/storage"
+	server "zheleznovux.com/modbus-console/cmd/serverStorage"
 	"zheleznovux.com/modbus-console/cmd/win/commander"
 )
 
@@ -44,36 +44,35 @@ func InitConfig(file string) {
 	fmt.Println("Выполнена загрузка конфигурации команд")
 }
 
-func Run(th *tags.TagsHandler) {
+func Run(th *server.Server) {
 	winConfig := winConfigMgr.config.Load().(*WinConfig)
 	var channelCount int
 	quit := make(chan int)
+	var wg sync.WaitGroup
 
 	fmt.Println("Запущен обработчик")
 	for {
-		select {
-		case <-changeCh:
-			{
-				for j := 0; j < channelCount; j++ {
-					quit <- 1
-				}
-				channelCount = 0
+		<-changeCh
 
-				for i := range winConfig.nodeCommand {
-					c, err := commander.Setup(winConfig.nodeCommand[i], th)
-					if err != nil {
-						fmt.Println(err)
-						continue
-					}
+		fmt.Println("win chage")
+		close(quit)
+		wg.Wait()
+		quit = make(chan int)
 
-					go c.StartChecking(quit)
-					channelCount++
-				}
+		for i := range winConfig.nodeCommand {
+			c, err := commander.Setup(winConfig.nodeCommand[i], th)
+			if err != nil {
+				fmt.Println(err)
+				continue
 			}
-		default:
-			{
-				time.Sleep(2 * time.Second)
-			}
+
+			wg.Add(1)
+			fmt.Println("1")
+
+			go c.StartChecking(quit, &wg)
+			channelCount++
 		}
+
 	}
+
 }

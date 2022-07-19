@@ -1,1 +1,1 @@
-[{"Name":"testNode1","Tags":[{"Name":"testTag1","DataType":"dword","Address":1,"Value":0,"Timestamp":"","State":false},{"Name":"testTag2","DataType":"coil","Address":4,"Value":0,"Timestamp":"","State":false}]},{"Name":"testNode2","Tags":[{"Name":"testTag1","DataType":"word","Address":1,"Value":0,"Timestamp":"","State":false},{"Name":"testTag2","DataType":"coil","Address":2,"Value":0,"Timestamp":"","State":false}]}]
+[{}]

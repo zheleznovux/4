@@ -6,11 +6,14 @@ import (
 	"math"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"zheleznovux.com/modbus-console/cmd/configuration"
-	"zheleznovux.com/modbus-console/cmd/constants"
-	tags "zheleznovux.com/modbus-console/cmd/storage"
+	"zheleznovux.com/modbus-console/cmd/serverStorage/constants"
+
+	storage "zheleznovux.com/modbus-console/cmd/serverStorage"
+	"zheleznovux.com/modbus-console/cmd/serverStorage/tag"
 )
 
 type DWordCommander struct {
@@ -21,7 +24,7 @@ type DWordCommander struct {
 	action          string
 	actionTimeout   time.Duration
 	scanPeriod      time.Duration
-	th_ptr          *tags.TagsHandler
+	th_ptr          *storage.Server
 }
 
 type dwordCondition struct {
@@ -54,7 +57,7 @@ func (dwc *DWordCommander) makeWordValueCondition(s string) error {
 	return nil
 }
 
-func (dwc *DWordCommander) setup(nt configuration.NodeTag, th *tags.TagsHandler) error {
+func (dwc *DWordCommander) setup(nt configuration.NodeTag, th *storage.Server) error {
 	dwc.name = nt.Name
 	var err error
 	if nt.Name == "" {
@@ -110,7 +113,7 @@ func (wc *DWordCommander) startCommand() {
 	}
 }
 
-func (dwc *DWordCommander) checkValue(ct *tags.DWordTag) bool {
+func (dwc *DWordCommander) checkValue(ct *tag.DWordTag) bool {
 	condition := true
 	for i := range dwc.dwordConditions {
 		switch dwc.dwordConditions[i].operator {
@@ -137,25 +140,32 @@ func (dwc *DWordCommander) checkValue(ct *tags.DWordTag) bool {
 	return condition
 }
 
-func (dwc *DWordCommander) StartChecking(quit chan int) {
+func (dwc *DWordCommander) StartChecking(quit chan int, wg *sync.WaitGroup) {
+	fmt.Println("запущен dwc")
+	defer wg.Done()
+	defer fmt.Println("прекращен dwc")
+
 	for {
 		select {
+		case <-quit:
+			{
+				return
+			}
 		default:
 			{
 				wt, err := dwc.th_ptr.GetTagByName(dwc.Name())
 				if err != nil {
+					fmt.Println(dwc.Name() + " " + err.Error())
 					return
 				}
-				fmt.Println(wt)
-				op1 := dwc.checkValue(wt.(*tags.DWordTag))
-				if dwc.checkLogic(op1, wt.(*tags.DWordTag).State()) {
+				op1 := dwc.checkValue(wt.(*tag.DWordTag))
+				if dwc.checkLogic(op1, wt.(*tag.DWordTag).State()) {
 					dwc.startCommand()
 				}
+				time.Sleep(dwc.scanPeriod)
+
 			}
-		case <-quit:
-			return
 		}
-		time.Sleep(dwc.scanPeriod)
 	}
 }
 
