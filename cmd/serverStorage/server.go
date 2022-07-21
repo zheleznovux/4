@@ -27,7 +27,6 @@ var changeCh chan int = make(chan int)
 
 func (thisSH *Server) Callback(conf *configuration.ConfigHandler) {
 	thisSH.Setup(conf)
-	fmt.Println(thisSH.data[0])
 	changeCh <- 1
 }
 
@@ -47,7 +46,7 @@ func (thisSH *Server) Setup(confHandler *configuration.ConfigHandler) {
 			{
 				var err error
 
-				tmp, err = client.NewClinetModbus(nodes[i].IP, nodes[i].Port, nodes[i].ID, nodes[i].Name, nodes[i].Debug, int(nodes[i].ConnectionAttempts), nodes[i].ConnectionTimeout)
+				tmp, err = client.NewClinetModbus(nodes[i].IP, nodes[i].Port, nodes[i].ID, nodes[i].Name, nodes[i].Log, int(nodes[i].ConnectionAttempts), nodes[i].ConnectionTimeout)
 				if err != nil {
 					fmt.Println(err)
 					continue
@@ -130,6 +129,7 @@ func (thisSH *Server) Run() {
 	quit := make(chan struct{})
 	var wg sync.WaitGroup
 
+	saveTicker := time.NewTicker(10 * time.Second)
 	for {
 		// сигнал смены конфига
 		select {
@@ -138,16 +138,16 @@ func (thisSH *Server) Run() {
 				close(quit)
 				wg.Wait()
 				quit = make(chan struct{})
-				fmt.Println("app change")
 
 				for clientId := range thisSH.data {
 					wg.Add(1)
 					go thisSH.data[clientId].Start(quit, &wg)
 				}
 			}
-		default:
-			time.Sleep(10 * time.Second)
-			thisSH.Save()
+		case <-saveTicker.C:
+			{
+				thisSH.Save()
+			}
 		}
 	}
 }

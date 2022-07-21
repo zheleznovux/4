@@ -67,10 +67,10 @@ func (c *ConfigHandler) GetConfig() ConfigurationData {
 }
 
 func (c *ConfigHandler) reload() {
-	ticker := time.NewTicker(time.Second * 5)
+	ticker := time.NewTicker(time.Second)
 
 	for range ticker.C {
-
+		ticker.Stop()
 		func() {
 			f, err := os.Open(c.fileName)
 			if err != nil {
@@ -103,7 +103,9 @@ func (c *ConfigHandler) reload() {
 					n.Callback(c)
 				}
 			}
+
 		}()
+		ticker.Reset(time.Second * 5)
 	}
 }
 

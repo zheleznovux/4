@@ -3,7 +3,6 @@ package tag
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -132,7 +131,7 @@ func (dwt *DWordTag) ScanPeriod() float64 {
 }
 func (dwt *DWordTag) SetScanPeriod(time float64) error {
 	if time < 0 {
-		return fmt.Errorf("time < 0")
+		return errors.New("time < 0")
 	}
 	dwt.scanPeriod = time
 	return nil

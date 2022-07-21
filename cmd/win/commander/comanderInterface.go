@@ -1,7 +1,7 @@
 package commander
 
 import (
-	"fmt"
+	"errors"
 	"os/exec"
 	"strings"
 	"sync"
@@ -15,8 +15,7 @@ import (
 
 type CommanderInterface interface {
 	setup(configuration.NodeTag, *tags.Server) error
-	StartChecking(chan int, *sync.WaitGroup)
-	checkLogic(bool, bool) bool
+	StartChecking(chan struct{}, *sync.WaitGroup)
 	Name() string
 }
 
@@ -32,7 +31,7 @@ func makeAction(s string) (string, error) {
 	if strings.Contains(trimmed, constants.RUN_PROGRAM+" ") {
 		return trimmed, nil
 	}
-	return "", fmt.Errorf("did not have action")
+	return "", errors.New("did not have action")
 }
 
 func makeSecond(t float64) time.Duration {
@@ -63,7 +62,7 @@ func Setup(nt configuration.NodeTag, th *tags.Server) (CommanderInterface, error
 			return &rtn, err
 		}
 	default:
-		return nil, fmt.Errorf("did not have data type")
+		return nil, errors.New("did not have data type")
 	}
 }
 
@@ -83,7 +82,7 @@ func command(c string) error {
 	case constants.RUN_PROGRAM:
 		{
 			if len(exe) != 2 {
-				return fmt.Errorf("len(2) != 2")
+				return errors.New("len(exe) != 2")
 			}
 			cmd := exec.Command("./" + exe[1])
 			err := cmd.Run()
@@ -93,16 +92,11 @@ func command(c string) error {
 			return nil
 		}
 	default:
-		return fmt.Errorf("invalid command")
+		return errors.New("invalid command")
 	}
 
 	if err := exec.Command("cmd", "/C", "shutdown "+flag+" /t 1").Run(); err != nil {
 		return err
 	}
 	return nil
-}
-
-func timer(t time.Duration, start chan bool) {
-	time.Sleep(t)
-	start <- true
 }

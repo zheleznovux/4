@@ -8,6 +8,7 @@ import (
 
 	"zheleznovux.com/modbus-console/cmd/configuration"
 	storage "zheleznovux.com/modbus-console/cmd/serverStorage"
+	"zheleznovux.com/modbus-console/cmd/win"
 )
 
 func InitConfig(file string, storageHandler *storage.Server) {
@@ -19,8 +20,6 @@ func InitConfig(file string, storageHandler *storage.Server) {
 
 	conf.AddObserver(storageHandler)
 	storageHandler.Setup(conf)
-
-	fmt.Println("Выполнена загрузка конфигурации тэгов")
 }
 
 func main() {
@@ -33,11 +32,11 @@ func main() {
 		}
 	}
 	InitConfig("config.json", storageHandler)
-	// win.InitConfig("win_config.json")
+	win.InitConfig("win_config.json")
 
 	go storageHandler.Run()
 
-	// go win.Run(storageHandler)
+	go win.Run(storageHandler)
 
 	for {
 		time.Sleep(200000000)

@@ -24,6 +24,7 @@ type WordCommander struct {
 	action         string
 	actionTimeout  time.Duration
 	scanPeriod     time.Duration
+	log            Logger
 	th_ptr         *storage.Server
 }
 
@@ -92,6 +93,10 @@ func (wc *WordCommander) setup(nt configuration.NodeTag, th *storage.Server) err
 	wc.scanPeriod = makeSecond(nt.ScanPeriod)
 
 	wc.th_ptr = th
+	wc.log = Logger{
+		ParentNodeName: wc.name,
+		IsLogOutput:    nt.Log,
+	}
 	return nil
 }
 
@@ -99,16 +104,44 @@ func (wc *WordCommander) Name() string {
 	return wc.name
 }
 
-func (wc *WordCommander) startCommand() {
-	start := make(chan bool)
-	go timer(wc.actionTimeout, start)
-	fmt.Println("Запущен таймер команды " + wc.action)
-	if <-start {
-		err := command(wc.action)
-		if err != nil {
-			fmt.Println(err)
-		} else {
-			return
+func (wc *WordCommander) startCommand(condition chan bool, quit chan struct{}, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	ticker := time.NewTicker(wc.actionTimeout)
+	ticker.Stop()
+
+	var lastCondition bool
+	for {
+		select {
+		case <-quit:
+			{
+				return
+			}
+		case <-ticker.C:
+			{
+				ticker.Stop()
+				wc.log.Write(INFO, "Запущена команда!")
+				err := command(wc.action)
+				if err != nil {
+					fmt.Println(err)
+				}
+				ticker.Reset(wc.actionTimeout)
+			}
+		case v := <-condition:
+			{
+				fmt.Println(v)
+				if lastCondition != v {
+					lastCondition = v
+					if v {
+						ticker.Reset(wc.actionTimeout)
+						wc.log.Write(INFO, "Запущен таймер команды, до завершения: "+wc.actionTimeout.String()+".")
+
+					} else {
+						ticker.Stop()
+						wc.log.Write(INFO, "Таймер команды остановлен!")
+					}
+				}
+			}
 		}
 	}
 }
@@ -137,50 +170,47 @@ func (wc *WordCommander) checkValue(ct *tag.WordTag) bool {
 			return false
 		}
 	}
+
+	switch wc.logic {
+	case constants.AND:
+		{
+			condition = condition && ct.State()
+		}
+	case constants.OR:
+		{
+			condition = condition || ct.State()
+		}
+	}
+
 	return condition
 }
 
-func (wc *WordCommander) StartChecking(quit chan int, wg *sync.WaitGroup) {
-	fmt.Println("запущен wc")
+func (wc *WordCommander) StartChecking(quit chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
-	defer fmt.Println("прекращен wc")
 
+	ticker := time.NewTicker(wc.scanPeriod)
+	var condition chan bool = make(chan bool)
+
+	wg.Add(1)
+	go wc.startCommand(condition, quit, wg)
 	for {
 		select {
 		case <-quit:
 			{
 				return
 			}
-		default:
+		case <-ticker.C:
 			{
+				ticker.Stop()
 				wt, err := wc.th_ptr.GetTagByName(wc.Name())
 				if err != nil {
-					fmt.Println(wc.Name() + " " + err.Error())
+					wc.log.Write(ERROR, err.Error())
 					return
 				}
-				op1 := wc.checkValue(wt.(*tag.WordTag))
-				if wc.checkLogic(op1, wt.(*tag.WordTag).State()) {
-					wc.startCommand()
-				}
-				time.Sleep(wc.scanPeriod)
+				condition <- wc.checkValue(wt.(*tag.WordTag))
 
+				ticker.Reset(wc.scanPeriod)
 			}
-
 		}
-	}
-}
-
-func (wc WordCommander) checkLogic(op1 bool, op2 bool) bool {
-	switch wc.logic {
-	case constants.AND:
-		{
-			return op1 && op2
-		}
-	case constants.OR:
-		{
-			return op1 || op2
-		}
-	default:
-		return false
 	}
 }

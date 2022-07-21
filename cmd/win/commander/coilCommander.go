@@ -2,7 +2,6 @@ package commander
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -21,6 +20,7 @@ type CoilCommander struct {
 	action         string
 	actionTimeout  time.Duration
 	scanPeriod     time.Duration
+	log            Logger
 	th_ptr         *storage.Server
 }
 
@@ -63,6 +63,10 @@ func (wc *CoilCommander) setup(nt configuration.NodeTag, th *storage.Server) err
 	wc.scanPeriod = makeSecond(nt.ScanPeriod)
 
 	wc.th_ptr = th
+	wc.log = Logger{
+		ParentNodeName: wc.name,
+		IsLogOutput:    nt.Log,
+	}
 	return nil
 }
 
@@ -70,63 +74,97 @@ func (wc *CoilCommander) Name() string {
 	return wc.name
 }
 
-func (cc *CoilCommander) StartChecking(quit chan int, wg *sync.WaitGroup) {
-	fmt.Println("запущен cc")
+func (cc *CoilCommander) StartChecking(quit chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
-	defer fmt.Println("прекращен cc")
 
+	ticker := time.NewTicker(cc.scanPeriod)
+	var condition chan bool = make(chan bool)
+
+	wg.Add(1)
+	go cc.startCommand(condition, quit, wg)
 	for {
 		select {
 		case <-quit:
 			{
 				return
 			}
-		default:
+		case <-ticker.C:
 			{
-				ct, err := cc.th_ptr.GetTagByName(cc.Name())
+				ticker.Stop()
+				wt, err := cc.th_ptr.GetTagByName(cc.Name())
 				if err != nil {
-					fmt.Println(cc.Name() + " " + err.Error())
+					cc.log.Write(ERROR, err.Error())
 					return
 				}
-				op1 := cc.checkValue(ct.(*tag.CoilTag))
-				if cc.checkLogic(op1, ct.(*tag.CoilTag).State()) {
-					cc.startCommand()
-				}
-				time.Sleep(cc.scanPeriod)
+				condition <- cc.checkValue(wt.(*tag.CoilTag))
+
+				ticker.Reset(cc.scanPeriod)
 			}
 		}
 	}
 }
 
 func (cc *CoilCommander) checkValue(ct *tag.CoilTag) bool {
-	return (ct.Value() == 1) == cc.valueCondition
-}
-
-func (cc *CoilCommander) startCommand() {
-	start := make(chan bool)
-	go timer(cc.actionTimeout, start)
-	fmt.Println("Запущен таймер команды " + cc.action)
-	if <-start {
-		err := command(cc.action)
-		if err != nil {
-			fmt.Println(err)
-		} else {
-			return
-		}
-	}
-}
-
-func (wc *CoilCommander) checkLogic(op1 bool, op2 bool) bool {
-	switch wc.logic {
+	switch cc.logic {
 	case constants.AND:
 		{
-			return op1 && op2
+			return (ct.Value() == 1) == cc.valueCondition && ct.State()
 		}
 	case constants.OR:
 		{
-			return op1 || op2
+			return (ct.Value() == 1) == cc.valueCondition || ct.State()
 		}
 	default:
 		return false
+	}
+}
+
+func (cc *CoilCommander) startCommand(condition chan bool, quit chan struct{}, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	timeBetweenTick := cc.actionTimeout / 5
+	tickerToCommand := time.NewTicker(cc.actionTimeout)
+	tickerToCommand.Stop()
+	tickCount := 0
+
+	var lastCondition bool
+	for {
+		select {
+		case <-quit:
+			{
+				return
+			}
+		case <-tickerToCommand.C:
+			{
+				tickerToCommand.Stop()
+				tickCount++
+				if tickCount != 5 {
+					timeToCommand := cc.actionTimeout - time.Duration(tickCount)*timeBetweenTick
+					cc.log.Write(INFO, "Команда "+cc.action+", до завершения таймера: "+timeToCommand.String()+".")
+				} else {
+					tickCount = 0
+					cc.log.Write(INFO, "Запущена команда!")
+					err := command(cc.action)
+					if err != nil {
+						cc.log.Write(ERROR, err.Error())
+					}
+				}
+				tickerToCommand.Reset(timeBetweenTick)
+			}
+		case v := <-condition:
+			{
+				if lastCondition != v {
+					lastCondition = v
+					tickCount = 0
+					if v {
+						cc.log.Write(INFO, "Запущен таймер команды "+cc.action+", до исполнения: "+cc.actionTimeout.String()+".")
+						tickerToCommand.Reset(timeBetweenTick)
+					} else {
+						cc.log.Write(INFO, "Таймер команды остановлен!")
+						tickerToCommand.Stop()
+					}
+				}
+			}
+		}
 	}
 }

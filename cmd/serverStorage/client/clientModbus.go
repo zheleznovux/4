@@ -1,16 +1,17 @@
 package client
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	modbus "github.com/things-go/go-modbus"
+	modbus1 "github.com/things-go/go-modbus"
 	constants "zheleznovux.com/modbus-console/cmd/serverStorage/constants"
+	"zheleznovux.com/modbus-console/cmd/serverStorage/logger"
 	tag "zheleznovux.com/modbus-console/cmd/serverStorage/tag"
 )
 
@@ -20,17 +21,34 @@ type ClientModbus struct {
 	ip                 string
 	port               int
 	slaveId            uint8
-	isLogged           bool
 	connectionAttempts int
 	connectionTimeout  time.Duration
+	log                logger.Logger
+	state              string
 	tags               []tag.TagInterface
-	sender             modbus.Client
+	sender             modbus1.Client
+}
+
+func (c *ClientModbus) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Name    string
+		Ip      string
+		SlaveId uint8
+		State   string
+		Tags    []tag.TagInterface
+	}{
+		Name:    c.name,
+		Ip:      c.ip,
+		SlaveId: c.slaveId,
+		State:   c.state,
+		Tags:    c.tags,
+	})
 }
 
 // ======================инициализация========================{
 
 // =================================Name
-func (c ClientModbus) Name() string {
+func (c *ClientModbus) Name() string {
 	return c.name
 }
 func (c *ClientModbus) SetName(name string) error {
@@ -42,7 +60,7 @@ func (c *ClientModbus) SetName(name string) error {
 }
 
 // =================================Type
-func (c ClientModbus) Type() string {
+func (c *ClientModbus) Type() string {
 	return c.connectionType
 }
 func (c *ClientModbus) SetType() {
@@ -50,7 +68,7 @@ func (c *ClientModbus) SetType() {
 }
 
 // ===================================IP
-func (c ClientModbus) Ip() string {
+func (c *ClientModbus) Ip() string {
 	return c.ip
 }
 
@@ -66,7 +84,7 @@ func (c *ClientModbus) SetIp(ip string) error {
 }
 
 // ===================ConnectionAttempts
-func (c ClientModbus) ConnectionAttempts() int {
+func (c *ClientModbus) ConnectionAttempts() int {
 	return c.connectionAttempts
 }
 func (c *ClientModbus) SetConnectionAttempts(ca int) error {
@@ -78,7 +96,7 @@ func (c *ClientModbus) SetConnectionAttempts(ca int) error {
 }
 
 // =================================Port
-func (c ClientModbus) Port() int {
+func (c *ClientModbus) Port() int {
 	return c.port
 }
 func (c *ClientModbus) SetPort(port int) error {
@@ -92,7 +110,7 @@ func (c *ClientModbus) SetPort(port int) error {
 }
 
 // ==============================SlaveID
-func (c ClientModbus) SalveId() uint8 {
+func (c *ClientModbus) SalveId() uint8 {
 	return c.slaveId
 }
 func (c *ClientModbus) SetSalveId(sid uint8) error {
@@ -104,7 +122,7 @@ func (c *ClientModbus) SetSalveId(sid uint8) error {
 }
 
 // =================================Tags
-func (c ClientModbus) Tags() []tag.TagInterface {
+func (c *ClientModbus) Tags() []tag.TagInterface {
 	return c.tags
 }
 func (c *ClientModbus) SetTags(tags []tag.TagInterface) error {
@@ -118,13 +136,13 @@ func (c *ClientModbus) SetTags(tags []tag.TagInterface) error {
 }
 
 // ============================TagById
-func (c ClientModbus) TagById(id int) (tag.TagInterface, error) {
+func (c *ClientModbus) TagById(id int) (tag.TagInterface, error) {
 	if (id >= len(c.tags)) || (id < 0) {
 		return nil, errors.New("invalid id client tag. {getter client tag by id}")
 	}
 	return c.tags[id], nil
 }
-func (c ClientModbus) TagByName(name string) (tag.TagInterface, error) {
+func (c *ClientModbus) TagByName(name string) (tag.TagInterface, error) {
 	for id := range c.tags {
 		if c.tags[id].Name() == name {
 			return c.tags[id], nil
@@ -152,12 +170,15 @@ func (c *ClientModbus) SetConnectionTimeout(s float64) error {
 	return nil
 }
 
-// ==============================isLogged
-func (c *ClientModbus) IsLogged() bool {
-	return c.isLogged
-}
-func (c *ClientModbus) SetIsLogged(il bool) {
-	c.isLogged = il
+// // ==============================State
+func (c *ClientModbus) setState(state string) (isChanged bool) {
+	if c.state != state {
+		c.state = state
+		isChanged = true
+	} else {
+		isChanged = false
+	}
+	return
 }
 
 // ==========================Constructor
@@ -181,7 +202,6 @@ func NewClinetModbus(ip string, port int, slaveID uint8, name string, debug bool
 	if err != nil {
 		return nil, err
 	}
-	c.SetIsLogged(debug)
 	err = c.SetConnectionAttempts(ConnectionAttempts)
 	if err != nil {
 		return nil, err
@@ -190,6 +210,11 @@ func NewClinetModbus(ip string, port int, slaveID uint8, name string, debug bool
 	if err != nil {
 		return nil, err
 	}
+	c.log = logger.Logger{
+		ParentNodeName: c.name,
+		ParentNodeIp:   c.ip,
+		IsLogOutput:    debug,
+	}
 
 	return &c, nil
 }
@@ -197,29 +222,18 @@ func NewClinetModbus(ip string, port int, slaveID uint8, name string, debug bool
 //======================инициализация========================}
 
 func (c *ClientModbus) Connect() error {
-	var provider modbus.ClientProvider
-
-	if c.isLogged {
-		provider = modbus.NewTCPClientProvider(
-			c.ip+":"+fmt.Sprint(c.port),
-			modbus.WithEnableLogger())
-	} else {
-		provider = modbus.NewTCPClientProvider(
-			c.ip + ":" + fmt.Sprint(c.port))
-	}
-	c.sender = modbus.NewClient(provider)
+	provider := modbus1.NewTCPClientProvider(
+		c.ip + ":" + fmt.Sprint(c.port))
+	c.sender = modbus1.NewClient(provider)
+	defer c.sender.Close()
 
 	//устанавливаем соединение
 	err := c.sender.Connect()
 	if err != nil {
-		return fmt.Errorf("Ошибка соединения! " + err.Error())
+		return errors.New("Ошибка соединения! " + err.Error())
 	} else {
 		return nil
 	}
-}
-
-func (c *ClientModbus) Close() {
-	c.sender.Close()
 }
 
 func (c *ClientModbus) Send(id int) error {
@@ -227,6 +241,7 @@ func (c *ClientModbus) Send(id int) error {
 		c.tags[id].SetState(false)
 		return errors.New("sender nil")
 	}
+	defer c.sender.Close()
 
 	//новые типы должны быть указаны здесь
 	switch c.tags[id].DataType() {
@@ -241,11 +256,11 @@ func (c *ClientModbus) Send(id int) error {
 
 			if len(resp) > 0 {
 				c.tags[id].(*tag.CoilTag).SetValue(resp[0])
-				fmt.Println("Клиент " + c.name + " IP : " + c.ip + " Тэг " + c.tags[id].Name() + " = " + strconv.Itoa(int(resp[0])))
+				// c.log.WriteWithTag(logger.INFO, c.state, c.tags[id].Name(), "Значение: "+strconv.Itoa(int(resp[0]))+".")
 				return nil
 			} else {
 				c.tags[id].SetState(false)
-				fmt.Println("Клиент " + c.name + " IP : " + c.ip + " Тэг " + c.tags[id].Name() + " не смог считать значение!")
+				// c.log.WriteWithTag(logger.WARNING, c.state, c.tags[id].Name(), "Значение не было считано!")
 				return nil
 			}
 		}
@@ -260,11 +275,11 @@ func (c *ClientModbus) Send(id int) error {
 
 			if len(resp) > 0 {
 				c.tags[id].(*tag.WordTag).SetValue(resp[0])
-				fmt.Println("Клиент " + c.name + " IP : " + c.ip + " Тэг " + c.tags[id].Name() + " = " + strconv.Itoa(int(resp[0])))
+				// c.log.WriteWithTag(logger.INFO, c.state, c.tags[id].Name(), "Значение: "+strconv.Itoa(int(resp[0]))+".")
 				return nil
 			} else {
 				c.tags[id].SetState(false)
-				fmt.Println("Клиент " + c.name + " IP : " + c.ip + " Тэг " + c.tags[id].Name() + " не смог считать значение!")
+				// c.log.WriteWithTag(logger.WARNING, c.state, c.tags[id].Name(), "Значение не было считано!")
 				return nil
 			}
 		}
@@ -280,11 +295,11 @@ func (c *ClientModbus) Send(id int) error {
 			if len(resp) > 1 {
 				var tmp uint32 = (uint32(resp[0]) << 16) + uint32(resp[1])
 				c.tags[id].(*tag.DWordTag).SetValue(tmp)
-				fmt.Println("Клиент " + c.name + " IP : " + c.ip + ". Тег " + c.tags[id].Name() + " = " + strconv.Itoa(int(tmp)))
+				// c.log.WriteWithTag(logger.INFO, c.state, c.tags[id].Name(), "Значение: "+strconv.Itoa(int(tmp))+".")
 				return nil
 			} else {
 				c.tags[id].SetState(false)
-				fmt.Println("Клиент " + c.name + " IP : " + c.ip + " Тэг " + c.tags[id].Name() + " не смог считать значение!")
+				// c.log.WriteWithTag(logger.WARNING, c.state, c.tags[id].Name(), "Значение не было считано!")
 				return nil
 			}
 		}
@@ -293,7 +308,7 @@ func (c *ClientModbus) Send(id int) error {
 	}
 }
 
-func (c ClientModbus) Start(stop chan struct{}, wg *sync.WaitGroup) {
+func (c *ClientModbus) Start(stop chan struct{}, wg *sync.WaitGroup) {
 	connection := make(chan bool)
 	quit := make(chan struct{})
 	defer wg.Done()
@@ -334,27 +349,8 @@ func (c ClientModbus) Start(stop chan struct{}, wg *sync.WaitGroup) {
 
 func (c *ClientModbus) TryConnect(quit chan struct{}, connection chan bool, wg *sync.WaitGroup) { /// connection day out
 	defer wg.Done()
+	ticker := time.NewTicker(time.Second)
 
-	for i := 1; i <= c.connectionAttempts; i++ {
-		select {
-		case <-quit:
-			{
-				return
-			}
-		default:
-			{
-				err := c.Connect()
-				if err == nil {
-					fmt.Println("Клиент " + c.name + " IP : " + c.ip + ": Подключенно")
-					connection <- true
-					return
-				}
-			}
-		}
-	}
-	fmt.Println("Клиент " + c.name + " IP : " + c.ip + ". Неудалось подключиться!")
-
-	ticker := time.NewTicker(c.connectionTimeout)
 	for {
 		select {
 		case <-quit:
@@ -363,6 +359,7 @@ func (c *ClientModbus) TryConnect(quit chan struct{}, connection chan bool, wg *
 			}
 		case <-ticker.C:
 			{
+				ticker.Stop()
 				for i := 1; i <= c.connectionAttempts; i++ {
 					select {
 					case <-quit:
@@ -373,14 +370,19 @@ func (c *ClientModbus) TryConnect(quit chan struct{}, connection chan bool, wg *
 						{
 							err := c.Connect()
 							if err == nil {
-								fmt.Println("Клиент " + c.name + " IP : " + c.ip + ": Подключенно")
+								if isChanged := c.setState(constants.GOOD); isChanged {
+									c.log.Write(logger.INFO, c.state, "Подключенно!")
+								}
 								connection <- true
 								return
 							}
 						}
 					}
 				}
-				fmt.Println("Клиент " + c.name + " IP : " + c.ip + ". Неудалось подключиться!")
+				if isChanged := c.setState(constants.BAD); isChanged {
+					c.log.Write(logger.WARNING, c.state, "Неудалось подключиться!")
+				}
+
 				ticker.Reset(c.connectionTimeout)
 			}
 		}
@@ -388,7 +390,8 @@ func (c *ClientModbus) TryConnect(quit chan struct{}, connection chan bool, wg *
 }
 
 func (c *ClientModbus) startSender(tagId int, quit chan struct{}, wg *sync.WaitGroup, connect chan bool) {
-	fmt.Println("Запущен опрос тега " + c.name + "." + c.tags[tagId].Name())
+	// c.log.WriteWithTag(logger.INFO, c.state, c.tags[tagId].Name(), "Запущен опрос тега!")
+
 	ticker := time.NewTicker(time.Duration(c.tags[tagId].ScanPeriod()) * time.Second)
 
 	defer wg.Done()
@@ -397,15 +400,14 @@ func (c *ClientModbus) startSender(tagId int, quit chan struct{}, wg *sync.WaitG
 		select {
 		case <-quit:
 			{
-				fmt.Println("Завершен опрос тега " + c.name + "." + c.tags[tagId].Name())
-				c.Close()
+				// c.log.WriteWithTag(logger.INFO, c.state, c.tags[tagId].Name(), "Завершен опрос тега!")
 				return
 			}
 		case <-ticker.C:
 			{
 				err := c.Send(tagId)
 				if err != nil {
-					fmt.Println("Ошибка тега " + c.name + "." + c.tags[tagId].Name() + " : " + err.Error())
+					c.log.WriteWithTag(logger.ERROR, c.state, c.tags[tagId].Name(), err.Error())
 					connect <- false
 				}
 			}

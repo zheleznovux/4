@@ -1,12 +1,13 @@
 {"NODES":[
     {
         "name":"testNode1.testTag1",
-        "dataType": "dword",
+        "dataType": "coil",
+        "log": true,
         "stateCondition" : "good",
-        "valueCondition" : "bit(1)",
+        "valueCondition" : "true",
         "logic": "and",
         "action": "run __debug_bin.exe",
-        "actionTimeout": 20,
+        "actionTimeout": 30,
         "scanPeriod": 5
     }
 ]}

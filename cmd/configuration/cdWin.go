@@ -16,6 +16,7 @@ type ConfigurationDataWin struct {
 type NodeTag struct {
 	Name           string
 	DataType       string
+	Log            bool
 	StateCondition string
 	ValueCondition string
 	Logic          string

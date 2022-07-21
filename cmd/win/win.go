@@ -41,23 +41,18 @@ func InitConfig(file string) {
 	winConfig.nodeCommand = conf.GetConfig().(*configuration.ConfigurationDataWin).NODES
 
 	winConfigMgr.config.Store(&winConfig)
-	fmt.Println("Выполнена загрузка конфигурации команд")
 }
 
 func Run(th *server.Server) {
 	winConfig := winConfigMgr.config.Load().(*WinConfig)
-	var channelCount int
-	quit := make(chan int)
+	quit := make(chan struct{})
 	var wg sync.WaitGroup
 
-	fmt.Println("Запущен обработчик")
 	for {
 		<-changeCh
-
-		fmt.Println("win chage")
 		close(quit)
 		wg.Wait()
-		quit = make(chan int)
+		quit = make(chan struct{})
 
 		for i := range winConfig.nodeCommand {
 			c, err := commander.Setup(winConfig.nodeCommand[i], th)
@@ -65,12 +60,8 @@ func Run(th *server.Server) {
 				fmt.Println(err)
 				continue
 			}
-
 			wg.Add(1)
-			fmt.Println("1")
-
 			go c.StartChecking(quit, &wg)
-			channelCount++
 		}
 
 	}

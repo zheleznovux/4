@@ -2,6 +2,7 @@ package configuration
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -20,7 +21,7 @@ type Node struct {
 	IP                 string
 	Port               int
 	ID                 uint8
-	Debug              bool
+	Log                bool
 	ConnectionTimeout  float64
 	ConnectionAttempts uint
 	TAGS               []Tag
@@ -94,7 +95,7 @@ func (tn *ConfigurationDataApp) Setup(c *ConfigHandler) error {
 				fmt.Println("App config: Node skipped Name: " + tmpTN.NODES[i].Name + " because " + err.Error())
 				continue
 			}
-			tmpNode.Debug = tmpTN.NODES[i].Debug
+			tmpNode.Log = tmpTN.NODES[i].Log
 			tmpNode.ConnectionAttempts, err = verifyNodeConnectionAttempts(tmpTN.NODES[i].ConnectionAttempts)
 			if err != nil {
 				fmt.Println("App config: Node skipped Name: " + tmpTN.NODES[i].Name + " because " + err.Error())
@@ -158,7 +159,7 @@ func verifyName(name string) (string, error) { // эта функция такж
 	rtn := strings.TrimSpace(name)
 
 	if rtn == "" {
-		return rtn, fmt.Errorf("config did not have Name")
+		return rtn, errors.New("config did not have Name")
 	}
 	return rtn, nil
 }
@@ -167,7 +168,7 @@ func verifyConnectionType(ct string) (string, error) {
 	rtn := strings.TrimSpace(ct)
 
 	if rtn == "" {
-		return rtn, fmt.Errorf("config did not have connection type")
+		return rtn, errors.New("config did not have connection type")
 	}
 	return rtn, nil
 }
@@ -176,35 +177,35 @@ func verifyNodeIP(ip string) (string, error) {
 	ipAddr := net.ParseIP(strings.TrimSpace(ip))
 
 	if ipAddr == nil {
-		return strings.TrimSpace(ip), fmt.Errorf("config did not have Ip")
+		return strings.TrimSpace(ip), errors.New("config did not have Ip")
 	}
 	return strings.TrimSpace(ip), nil
 }
 
 func verifyNodePort(port int) (int, error) {
 	if port == 0 {
-		return port, fmt.Errorf("config did not have port")
+		return port, errors.New("config did not have port")
 	}
 	return port, nil
 }
 
 func verifyNodeID(id uint8) (uint8, error) {
 	if id == 0 {
-		return id, fmt.Errorf("config did not have ID")
+		return id, errors.New("config did not have ID")
 	}
 	return id, nil
 }
 
 func verifyNodeConnectionTimeout(ct float64) (float64, error) {
 	if ct < 0.001 {
-		return ct, fmt.Errorf("config connection timeout < 0.001")
+		return ct, errors.New("config connection timeout < 0.001")
 	}
 	return ct, nil
 }
 
 func verifyNodeConnectionAttempts(ca uint) (uint, error) {
 	if ca < 1 {
-		return ca, fmt.Errorf("config connection attempts < 1")
+		return ca, errors.New("config connection attempts < 1")
 	}
 	return ca, nil
 }
@@ -213,10 +214,7 @@ func verifyNodeConnectionAttempts(ca uint) (uint, error) {
 
 ///функции выполняющте верификацию полученных данных для тега TAG -----{
 func verifyTagAddress(address uint32) (uint32, error) {
-	if address == 0xFFFFFFFF {
-		return address, fmt.Errorf("config address >= 0xFFFF")
-	}
-	return address, nil
+	return address - 1, nil
 }
 
 func verifyTagDataType(dataType string) (string, error) { // эта функция также используется для верификации имени тэга
@@ -230,13 +228,13 @@ func verifyTagDataType(dataType string) (string, error) { // эта функци
 	case constants.WORD_TYPE:
 		return str, nil
 	default:
-		return str, fmt.Errorf("config did not have type")
+		return str, errors.New("config did not have type")
 	}
 }
 
 func verifyTagScanPeriod(sp float64) (float64, error) {
 	if sp < 0.001 {
-		return sp, fmt.Errorf("config scan period < 0.001")
+		return sp, errors.New("config scan period < 0.001")
 	}
 	return sp, nil
 }

@@ -24,6 +24,7 @@ type DWordCommander struct {
 	action          string
 	actionTimeout   time.Duration
 	scanPeriod      time.Duration
+	log             Logger
 	th_ptr          *storage.Server
 }
 
@@ -44,8 +45,7 @@ func (dwc *DWordCommander) makeWordValueCondition(s string) error {
 		var tmpNumber uint32
 		_, err := fmt.Sscanf(m[2], "%d", &tmpNumber)
 		if err != nil {
-			fmt.Println(err)
-			return fmt.Errorf("regexp found no number")
+			return errors.New("regexp found no number")
 		}
 
 		wordCondition := dwordCondition{
@@ -92,6 +92,10 @@ func (dwc *DWordCommander) setup(nt configuration.NodeTag, th *storage.Server) e
 	dwc.scanPeriod = makeSecond(nt.ScanPeriod)
 
 	dwc.th_ptr = th
+	dwc.log = Logger{
+		ParentNodeName: dwc.name,
+		IsLogOutput:    nt.Log,
+	}
 	return nil
 }
 
@@ -99,87 +103,122 @@ func (dwc *DWordCommander) Name() string {
 	return dwc.name
 }
 
-func (wc *DWordCommander) startCommand() {
-	start := make(chan bool)
-	go timer(wc.actionTimeout, start)
-	fmt.Println("Запущен таймер команды " + wc.action)
-	if <-start {
-		err := command(wc.action)
-		if err != nil {
-			fmt.Println(err)
-		} else {
-			return
-		}
-	}
-}
-
-func (dwc *DWordCommander) checkValue(ct *tag.DWordTag) bool {
+func (dwc *DWordCommander) checkValue(dwt *tag.DWordTag) bool {
 	condition := true
 	for i := range dwc.dwordConditions {
 		switch dwc.dwordConditions[i].operator {
 		case constants.MORE:
-			condition = (ct.Value() > dwc.dwordConditions[i].valueCondition) && condition
+			condition = (dwt.Value() > dwc.dwordConditions[i].valueCondition) && condition
 		case constants.LESS:
-			condition = (ct.Value() < dwc.dwordConditions[i].valueCondition) && condition
+			condition = (dwt.Value() < dwc.dwordConditions[i].valueCondition) && condition
 		case constants.EQUAL:
-			condition = (ct.Value() == dwc.dwordConditions[i].valueCondition) && condition
+			condition = (dwt.Value() == dwc.dwordConditions[i].valueCondition) && condition
 		case constants.NOT_EQUAL:
-			condition = (ct.Value() != dwc.dwordConditions[i].valueCondition) && condition
+			condition = (dwt.Value() != dwc.dwordConditions[i].valueCondition) && condition
 		case constants.MORE_EQUAL:
-			condition = (ct.Value() >= dwc.dwordConditions[i].valueCondition) && condition
+			condition = (dwt.Value() >= dwc.dwordConditions[i].valueCondition) && condition
 		case constants.LESS_EQUAL:
-			condition = (ct.Value() <= dwc.dwordConditions[i].valueCondition) && condition
+			condition = (dwt.Value() <= dwc.dwordConditions[i].valueCondition) && condition
 		case constants.BIT:
-			condition = ((ct.Value() & uint32(math.Pow(2, float64(dwc.dwordConditions[i].valueCondition)))) != 0) && condition
+			condition = ((dwt.Value() & uint32(math.Pow(2, float64(dwc.dwordConditions[i].valueCondition)))) != 0) && condition
 		case constants.NOT_BIT:
-			condition = ((ct.Value() & uint32(math.Pow(2, float64(dwc.dwordConditions[i].valueCondition)))) == 0) && condition
+			condition = ((dwt.Value() & uint32(math.Pow(2, float64(dwc.dwordConditions[i].valueCondition)))) == 0) && condition
 		default:
-			return false
+			condition = false
 		}
 	}
+
+	switch dwc.logic {
+	case constants.AND:
+		{
+			condition = condition && dwt.State()
+		}
+	case constants.OR:
+		{
+			condition = condition || dwt.State()
+		}
+	}
+
 	return condition
 }
 
-func (dwc *DWordCommander) StartChecking(quit chan int, wg *sync.WaitGroup) {
-	fmt.Println("запущен dwc")
+func (dwc *DWordCommander) StartChecking(quit chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
-	defer fmt.Println("прекращен dwc")
 
+	ticker := time.NewTicker(dwc.scanPeriod)
+	var condition chan bool = make(chan bool)
+
+	wg.Add(1)
+	go dwc.startCommand(condition, quit, wg)
 	for {
 		select {
 		case <-quit:
 			{
 				return
 			}
-		default:
+		case <-ticker.C:
 			{
+				ticker.Stop()
 				wt, err := dwc.th_ptr.GetTagByName(dwc.Name())
 				if err != nil {
-					fmt.Println(dwc.Name() + " " + err.Error())
+					dwc.log.Write(INFO, err.Error())
 					return
 				}
-				op1 := dwc.checkValue(wt.(*tag.DWordTag))
-				if dwc.checkLogic(op1, wt.(*tag.DWordTag).State()) {
-					dwc.startCommand()
-				}
-				time.Sleep(dwc.scanPeriod)
+				condition <- dwc.checkValue(wt.(*tag.DWordTag))
 
+				ticker.Reset(dwc.scanPeriod)
 			}
 		}
 	}
 }
 
-func (dwc *DWordCommander) checkLogic(op1 bool, op2 bool) bool {
-	switch dwc.logic {
-	case constants.AND:
-		{
-			return op1 && op2
+func (wc *DWordCommander) startCommand(condition chan bool, quit chan struct{}, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	timeBetweenTick := wc.actionTimeout / 5
+	tickerToCommand := time.NewTicker(wc.actionTimeout)
+	tickerToCommand.Stop()
+	tickCount := 0
+
+	var lastCondition bool
+	for {
+		select {
+		case <-quit:
+			{
+				return
+			}
+		case <-tickerToCommand.C:
+			{
+				tickerToCommand.Stop()
+				tickCount++
+				if tickCount != 5 {
+					timeToCommand := wc.actionTimeout - time.Duration(tickCount)*timeBetweenTick
+					wc.log.Write(INFO, "Команда "+wc.action+", до завершения таймера: "+timeToCommand.String()+".")
+
+				} else {
+					tickCount = 0
+					wc.log.Write(INFO, "Запущена команда!")
+					err := command(wc.action)
+					if err != nil {
+						wc.log.Write(ERROR, err.Error())
+					}
+				}
+				tickerToCommand.Reset(timeBetweenTick)
+			}
+		case v := <-condition:
+			{
+				if lastCondition != v {
+					lastCondition = v
+					tickCount = 0
+					if v {
+						wc.log.Write(INFO, "Запущен таймер команды "+wc.action+", до завершения: "+wc.actionTimeout.String()+".")
+						tickerToCommand.Reset(timeBetweenTick)
+					} else {
+						wc.log.Write(INFO, "Таймер команды остановлен!")
+						tickerToCommand.Stop()
+					}
+				}
+			}
 		}
-	case constants.OR:
-		{
-			return op1 || op2
-		}
-	default:
-		return false
 	}
 }

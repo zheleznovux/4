@@ -2,7 +2,6 @@ package tag
 
 import (
 	"errors"
-	"fmt"
 
 	"zheleznovux.com/modbus-console/cmd/serverStorage/constants"
 )
@@ -58,6 +57,5 @@ func NewTag(name string, address uint32, scanPeriod float64, dataType string) (T
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(tagI)
 	return tagI, nil
 }
