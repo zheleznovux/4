@@ -1,1 +1,1 @@
-[{"Name":"testNode1","Ip":"127.0.0.1","SlaveId":1,"State":"good","Tags":[{"Name":"testTag1","DataType":"coil","Address":0,"Value":0,"Timestamp":"2022-07-21T10:03:15+03:00","State":true}]}]
+[{"Name":"testNode1","Ip":"127.0.0.1","SlaveId":1,"State":"bad","Tags":[{"Name":"testTag1","DataType":"coil","Address":0,"Value":0,"Timestamp":"2022-07-21T10:12:35+03:00","State":false}]}]

@@ -323,3 +323,5 @@
 2022-07-21 09:37:30 >> Node: name - testNode1, IP - 127.0.0.1, state - good. Message [INFO]: Подключенно!
 2022-07-21 10:01:55 >> Node: name - testNode1, IP - 127.0.0.1, state - bad. Message [WARNING]: Неудалось подключиться!
 2022-07-21 10:02:35 >> Node: name - testNode1, IP - 127.0.0.1, state - good. Message [INFO]: Подключенно!
+2022-07-21 10:12:41 >> Node: name - testNode1, IP - 127.0.0.1, state - good. Tag: name - testTag1. Message [ERROR]: dial tcp 127.0.0.1:502: i/o timeout
+2022-07-21 10:12:47 >> Node: name - testNode1, IP - 127.0.0.1, state - bad. Message [WARNING]: Неудалось подключиться!

@@ -8,10 +8,23 @@ import (
 	"time"
 
 	"zheleznovux.com/modbus-console/cmd/configuration"
+	storage "zheleznovux.com/modbus-console/cmd/serverStorage"
 	"zheleznovux.com/modbus-console/cmd/serverStorage/constants"
 
 	tags "zheleznovux.com/modbus-console/cmd/serverStorage"
 )
+
+type Commander struct {
+	name           string
+	stateCondition bool
+	valueCondition []Condition
+	logic          string
+	action         string
+	actionTimeout  time.Duration
+	scanPeriod     time.Duration
+	log            Logger
+	th_ptr         *storage.Server
+}
 
 type CommanderInterface interface {
 	setup(configuration.NodeTag, *tags.Server) error
